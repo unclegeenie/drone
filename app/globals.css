@@ -2641,6 +2641,18 @@ input:focus-visible {
   bottom: 178px;
 }
 
+.flight-shell.device-mobile .wind-indicator {
+  left: 10px;
+  top: 166px;
+  max-width: min(180px, calc(52vw - 20px));
+  justify-content: flex-start;
+  border-radius: 13px;
+  line-height: 1.25;
+  text-align: left;
+  transform: none;
+  white-space: normal;
+}
+
 .flight-shell.device-mobile .flight-topbar {
   min-height: 58px;
   padding: 8px 12px;
@@ -2701,6 +2713,273 @@ input:focus-visible {
 
 .flight-shell.device-mobile .telemetry-card strong {
   font-size: 16px;
+}
+
+/* 일반 스마트폰 세로 화면에서는 조종 정보와 조작부를 한 단계 키웁니다.
+   320px급 폭과 짧은 화면은 아래의 기존 압축 레이아웃을 그대로 사용합니다. */
+@media (min-width: 341px) and (max-width: 760px) and (min-height: 691px) and (orientation: portrait) {
+  .app-shell.device-mobile .brand strong {
+    font-size: 14.5px;
+  }
+
+  .app-shell.device-mobile .mobile-controller-status {
+    font-size: 11px;
+  }
+
+  .app-shell.device-mobile .panel-heading h1 {
+    font-size: 23px;
+  }
+
+  .app-shell.device-mobile .panel-heading p {
+    font-size: 12px;
+  }
+
+  .app-shell.device-mobile .eyebrow {
+    font-size: 9px;
+  }
+
+  .app-shell.device-mobile .setting-group legend {
+    font-size: 14.5px;
+  }
+
+  .app-shell.device-mobile .setting-group legend span {
+    font-size: 11px;
+  }
+
+  .app-shell.device-mobile .device-segmented strong,
+  .app-shell.device-mobile .grade-segmented strong {
+    font-size: 14.5px;
+  }
+
+  .app-shell.device-mobile .device-segmented small,
+  .app-shell.device-mobile .grade-segmented small {
+    font-size: 10px;
+  }
+
+  .app-shell.device-mobile .mode-segmented button,
+  .app-shell.device-mobile .basis-segmented button {
+    font-size: 12px;
+  }
+
+  .app-shell.device-mobile .course-grid button {
+    font-size: 12px;
+  }
+
+  .app-shell.device-mobile .common-procedure,
+  .app-shell.device-mobile .exam-sequence span,
+  .app-shell.device-mobile .weight-input-row > label,
+  .app-shell.device-mobile .weight-help,
+  .app-shell.device-mobile .range-labels {
+    font-size: 11px;
+  }
+
+  .app-shell.device-mobile .number-field input {
+    font-size: 20px;
+  }
+
+  .app-shell.device-mobile .number-field span {
+    font-size: 12px;
+  }
+
+  .app-shell.device-mobile .selection-summary > span {
+    font-size: 10px;
+  }
+
+  .app-shell.device-mobile .selection-summary strong {
+    font-size: 12.5px;
+  }
+
+  .app-shell.device-mobile .start-button {
+    font-size: 15.5px;
+  }
+
+  .app-shell.device-mobile .course-status h2 {
+    font-size: 20px;
+  }
+
+  .app-shell.device-mobile .course-status > p,
+  .app-shell.device-mobile .course-status dt,
+  .app-shell.device-mobile .course-status dd {
+    font-size: 11px;
+  }
+
+  .flight-shell.device-mobile .flight-topbar {
+    min-height: 66px;
+    gap: 8px;
+    padding: 9px 10px;
+  }
+
+  .flight-shell.device-mobile .flight-brand strong {
+    max-width: 132px;
+    font-size: 14px;
+  }
+
+  .flight-shell.device-mobile .flight-top-actions {
+    gap: 6px;
+  }
+
+  .flight-shell.device-mobile .hud-action {
+    min-width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    font-size: 13px;
+  }
+
+  .flight-shell.device-mobile .guide-mode-toggle {
+    padding: 0 10px;
+  }
+
+  .flight-shell.device-mobile .guide-mode-toggle b {
+    font-size: 11px;
+  }
+
+  .flight-shell.device-mobile .hud-exit {
+    padding: 0 9px;
+  }
+
+  .flight-shell.device-mobile .flight-hud {
+    left: 9px;
+    right: 9px;
+    top: 76px;
+    gap: 8px;
+  }
+
+  .flight-shell.device-mobile .objective-card {
+    padding: 14px 14px 13px;
+  }
+
+  .flight-shell.device-mobile .objective-heading {
+    margin-bottom: 4px;
+    font-size: 9px;
+  }
+
+  .flight-shell.device-mobile .objective-heading b {
+    font-size: 9px;
+  }
+
+  .flight-shell.device-mobile .objective-card h1 {
+    font-size: 20px;
+  }
+
+  .flight-shell.device-mobile .objective-card > p {
+    font-size: 11px;
+  }
+
+  .flight-shell.device-mobile .telemetry-card > div {
+    min-height: 66px;
+    padding: 8px;
+  }
+
+  .flight-shell.device-mobile .telemetry-card span,
+  .flight-shell.device-mobile .telemetry-card small {
+    font-size: 9px;
+  }
+
+  .flight-shell.device-mobile .telemetry-card strong {
+    font-size: 18px;
+  }
+
+  .flight-shell.device-mobile .wind-indicator {
+    left: 9px;
+    top: 180px;
+    max-width: min(190px, calc(52vw - 20px));
+    gap: 7px;
+    font-size: 11px;
+    padding: 8px 10px;
+  }
+
+  .flight-shell.device-mobile .wind-indicator span {
+    font-size: 16px;
+    font-weight: 850;
+  }
+
+  .flight-shell.device-mobile .flight-warning {
+    bottom: 202px;
+    font-size: 12px;
+    padding: 9px 15px;
+  }
+
+  .flight-shell.device-mobile .touch-controls {
+    left: 8px;
+    right: 8px;
+    grid-template-columns: minmax(0, 1fr) 70px minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .flight-shell.device-mobile .touch-cluster {
+    width: clamp(112px, 33vw, 158px);
+    gap: 6px;
+  }
+
+  .flight-shell.device-mobile .touch-cluster-label {
+    font-size: 9px;
+  }
+
+  .flight-shell.device-mobile .touch-cluster-label b {
+    font-size: 10px;
+  }
+
+  .flight-shell.device-mobile .stick-thumb {
+    width: 34%;
+  }
+
+  .flight-shell.device-mobile .touch-actions {
+    gap: 8px;
+    padding-bottom: 10px;
+  }
+
+  .flight-shell.device-mobile .touch-action-button {
+    min-width: 66px;
+    min-height: 50px;
+    border-radius: 13px;
+    padding: 6px;
+  }
+
+  .flight-shell.device-mobile .touch-action-button span {
+    font-size: 18px;
+  }
+
+  .flight-shell.device-mobile .touch-action-button .power-symbol {
+    width: 17px;
+    height: 17px;
+  }
+
+  .flight-shell.device-mobile .touch-action-button b {
+    font-size: 9px;
+  }
+}
+
+@media (min-width: 341px) and (max-width: 520px) and (min-height: 691px) and (orientation: portrait) {
+  .flight-shell.device-mobile .flight-hud {
+    grid-template-columns:
+      minmax(0, 1fr)
+      clamp(160px, 46vw, 174px);
+  }
+
+  .flight-shell.device-mobile .objective-card {
+    width: auto;
+    min-width: 0;
+  }
+
+  .flight-shell.device-mobile .telemetry-card {
+    width: clamp(160px, 46vw, 174px);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .flight-shell.device-mobile .telemetry-card > div {
+    min-width: 0;
+    min-height: 50px;
+    padding: 5px 3px;
+  }
+
+  .flight-shell.device-mobile .telemetry-card strong {
+    font-size: 15px;
+  }
+
+  .flight-shell.device-mobile .telemetry-card span,
+  .flight-shell.device-mobile .telemetry-card small {
+    font-size: 8px;
+  }
 }
 
 @media (min-width: 761px) {

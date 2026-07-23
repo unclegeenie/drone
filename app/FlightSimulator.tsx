@@ -136,6 +136,11 @@ const COURSE_STAGE_LABELS: Record<string, string> = {
   diamond: "마름모비행",
 };
 
+const ATTI_STAGE_LABEL = COURSE_STAGE_LABELS["normal-landing"];
+
+const isAttiWaypoint = (point?: Waypoint) =>
+  point?.stage === ATTI_STAGE_LABEL;
+
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
@@ -145,6 +150,10 @@ const USB_AXIS_DEADZONE = 0.08;
 const HORIZONTAL_EXPO = 0.65;
 const YAW_EXPO = 0.5;
 const THROTTLE_EXPO = 0.45;
+const ATTI_HORIZONTAL_ACCELERATION = 2.1;
+const ATTI_AIR_DRAG = 0.34;
+const ATTI_AMBIENT_WIND_X = 0.065;
+const ATTI_AMBIENT_WIND_Z = 0.022;
 
 const smoothstep = (edge0: number, edge1: number, value: number) => {
   const progress = clamp((value - edge0) / (edge1 - edge0), 0, 1);
@@ -546,15 +555,18 @@ function buildCourseMission(courseId: string, courseLabel: string): Waypoint[] {
       ];
     case "normal-landing":
       return [
-        takeoff,
         waypoint(
           COURSE_POINTS.F_LEFT.x,
           COURSE_POINTS.F_LEFT.z,
           HOVER_ALTITUDE,
-          "좌측 F까지 이동 후 정상접근 준비",
+          "기준 고도 3.5m 확보 후 5초 호버링",
           stage,
-          2,
-          { radius: 1.8, hold: 3, mustStop: true },
+          1,
+          {
+            radius: 1.8,
+            hold: 5,
+            mustStop: true,
+          },
         ),
         waypoint(
           COURSE_POINTS.H.x,
@@ -565,7 +577,19 @@ function buildCourseMission(courseId: string, courseLabel: string): Waypoint[] {
           2,
           { radius: 2.2, hold: 5, mustStop: true },
         ),
-        landHome,
+        waypoint(
+          COURSE_POINTS.H.x,
+          COURSE_POINTS.H.z,
+          0,
+          "H 착륙장에 정상착륙",
+          stage,
+          2,
+          {
+            radius: 2.2,
+            hold: 0.5,
+            landing: true,
+          },
+        ),
       ];
     case "crosswind":
       return [
@@ -838,10 +862,12 @@ function buildExamMission(grade: Grade): Waypoint[] {
 function createInitialState(
   controllerName?: string,
   phase: FlightPhase = "briefing",
+  startX = FIELD.homeX,
+  startZ = FIELD.homeZ,
 ): FlightState {
   return {
-    x: FIELD.homeX,
-    z: FIELD.homeZ,
+    x: startX,
+    z: startZ,
     altitude: 0,
     vx: 0,
     vz: 0,
@@ -1261,10 +1287,24 @@ export default function FlightSimulator({
     () => Math.max(...mission.map((point) => point.stageNumber)),
     [mission],
   );
+  const startsFromLeftLandingPad =
+    trainingMode === "course" && courseId === "normal-landing";
+  const startX = startsFromLeftLandingPad
+    ? COURSE_POINTS.F_LEFT.x
+    : FIELD.homeX;
+  const startZ = startsFromLeftLandingPad
+    ? COURSE_POINTS.F_LEFT.z
+    : FIELD.homeZ;
 
   const initial = useMemo(
-    () => createInitialState(controllerName),
-    [controllerName],
+    () =>
+      createInitialState(
+        controllerName,
+        "briefing",
+        startX,
+        startZ,
+      ),
+    [controllerName, startX, startZ],
   );
   const flightRef = useRef<FlightState>(initial);
   const [snapshot, setSnapshot] = useState<FlightState>(initial);
@@ -1335,8 +1375,16 @@ export default function FlightSimulator({
     const current = flightRef.current;
     if (current.phase !== "briefing") return;
 
+    const startsInAttiMode = isAttiWaypoint(
+      mission[current.waypointIndex],
+    );
+    const startInstruction =
+      deviceMode === "mobile"
+        ? "비행장에 입장했습니다. 화면 하단 시동 버튼으로 수동 시동을 걸어주세요."
+        : "비행장에 입장했습니다. M키 또는 상단 전원 버튼으로 수동 시동을 걸어주세요.";
     pressedKeysRef.current.clear();
     keyHoldStartedAtRef.current.clear();
+    lastAnnouncedWaypointRef.current = current.waypointIndex;
     clearVirtualControls();
     commitState({
       ...current,
@@ -1350,11 +1398,11 @@ export default function FlightSimulator({
     });
     setHelpOpen(true);
     setAnnouncement(
-      deviceMode === "mobile"
-        ? "비행장에 입장했습니다. 화면 하단 시동 버튼으로 수동 시동을 걸어주세요."
-        : "비행장에 입장했습니다. M키 또는 상단 전원 버튼으로 수동 시동을 걸어주세요.",
+      startsInAttiMode
+        ? `${startInstruction} 이 코스는 ATTI 모드로 시작하며 GPS 위치 제동이 작동하지 않습니다.`
+        : startInstruction,
     );
-  }, [clearVirtualControls, commitState, deviceMode]);
+  }, [clearVirtualControls, commitState, deviceMode, mission]);
 
   const toggleMotors = useCallback(() => {
     const current = flightRef.current;
@@ -1461,12 +1509,20 @@ export default function FlightSimulator({
     const next = createInitialState(
       flightRef.current.controllerName ?? controllerName,
       "briefing",
+      startX,
+      startZ,
     );
     commitState(next);
     lastAnnouncedWaypointRef.current = -1;
     setHelpOpen(true);
     setAnnouncement("훈련을 초기화했습니다. 기체 시동부터 다시 시작합니다.");
-  }, [clearVirtualControls, commitState, controllerName]);
+  }, [
+    clearVirtualControls,
+    commitState,
+    controllerName,
+    startX,
+    startZ,
+  ]);
 
   const cycleGuideMode = useCallback(() => {
     const nextMode = NEXT_GUIDE_MODE[guideMode];
@@ -1862,6 +1918,8 @@ export default function FlightSimulator({
         const airborne =
           state.motorsArmed &&
           (state.altitude > 0.12 || state.autoVertical === "takeoff");
+        const activeWaypoint = mission[state.waypointIndex];
+        const attiModeActive = isAttiWaypoint(activeWaypoint);
         const yawRadians = (state.yaw * Math.PI) / 180;
         const targetVx =
           (roll * Math.cos(yawRadians) +
@@ -1879,38 +1937,65 @@ export default function FlightSimulator({
           (1 - Math.exp(-8 * delta));
 
         if (airborne) {
-          const horizontalCommand = Math.hypot(pitch, roll);
-          const velocityErrorX = targetVx - state.vx;
-          const velocityErrorZ = targetVz - state.vz;
-          const velocityError = Math.hypot(
-            velocityErrorX,
-            velocityErrorZ,
-          );
-          const velocityGain =
-            (horizontalCommand > 0.025 ? 2.4 : 3.8) * response;
-          const accelerationLimit =
-            (horizontalCommand > 0.025 ? 2.1 : 2.8) * response;
-          const requestedAcceleration = velocityError * velocityGain;
-          const appliedAcceleration = Math.min(
-            accelerationLimit,
-            requestedAcceleration,
-          );
+          if (attiModeActive) {
+            const attiAcceleration =
+              ATTI_HORIZONTAL_ACCELERATION * response;
+            const worldAx =
+              (roll * Math.cos(yawRadians) +
+                pitch * Math.sin(yawRadians)) *
+              attiAcceleration;
+            const worldAz =
+              (pitch * Math.cos(yawRadians) -
+                roll * Math.sin(yawRadians)) *
+              attiAcceleration;
+            state.vx += worldAx * delta;
+            state.vz += worldAz * delta;
 
-          if (velocityError > 0.0001) {
+            const airDrag = Math.exp(-ATTI_AIR_DRAG * delta);
+            state.vx *= airDrag;
+            state.vz *= airDrag;
             state.vx +=
-              (velocityErrorX / velocityError) *
-              appliedAcceleration *
+              (ATTI_AMBIENT_WIND_X +
+                Math.sin(state.elapsed * 0.43) * 0.012) *
               delta;
             state.vz +=
-              (velocityErrorZ / velocityError) *
-              appliedAcceleration *
+              (ATTI_AMBIENT_WIND_Z +
+                Math.cos(state.elapsed * 0.31) * 0.008) *
               delta;
+          } else {
+            const horizontalCommand = Math.hypot(pitch, roll);
+            const velocityErrorX = targetVx - state.vx;
+            const velocityErrorZ = targetVz - state.vz;
+            const velocityError = Math.hypot(
+              velocityErrorX,
+              velocityErrorZ,
+            );
+            const velocityGain =
+              (horizontalCommand > 0.025 ? 2.4 : 3.8) * response;
+            const accelerationLimit =
+              (horizontalCommand > 0.025 ? 2.1 : 2.8) * response;
+            const requestedAcceleration =
+              velocityError * velocityGain;
+            const appliedAcceleration = Math.min(
+              accelerationLimit,
+              requestedAcceleration,
+            );
+
+            if (velocityError > 0.0001) {
+              state.vx +=
+                (velocityErrorX / velocityError) *
+                appliedAcceleration *
+                delta;
+              state.vz +=
+                (velocityErrorZ / velocityError) *
+                appliedAcceleration *
+                delta;
+            }
           }
           state.yaw =
             (state.yaw + state.yawRate * delta + 360) % 360;
         }
 
-        const activeWaypoint = mission[state.waypointIndex];
         const windActive =
           activeWaypoint?.stage.includes("측풍") ||
           (trainingMode === "course" && courseId === "crosswind");
@@ -1936,8 +2021,12 @@ export default function FlightSimulator({
           state.vz * Math.sin(attitudeYaw);
         const pitchWeight = smoothstep(0.04, 0.14, Math.abs(pitch));
         const rollWeight = smoothstep(0.04, 0.14, Math.abs(roll));
-        const brakingPitch = -signedSpeedRatio(forwardSpeed) * 8;
-        const brakingRoll = -signedSpeedRatio(rightSpeed) * 8;
+        const brakingPitch = attiModeActive
+          ? 0
+          : -signedSpeedRatio(forwardSpeed) * 8;
+        const brakingRoll = attiModeActive
+          ? 0
+          : -signedSpeedRatio(rightSpeed) * 8;
         let targetPitch =
           brakingPitch + (pitch * 17 - brakingPitch) * pitchWeight;
         let targetRoll =
@@ -1964,8 +2053,15 @@ export default function FlightSimulator({
           ? throttle * 1.8 * response
           : 0;
         if (state.motorsArmed && state.autoVertical === "takeoff") {
-          desiredVerticalSpeed = state.altitude < 2.95 ? 1.55 : 0;
-          if (state.altitude >= 2.95) {
+          const takeoffTargetAltitude = clamp(
+            activeWaypoint?.altitude ?? 3,
+            3,
+            HOVER_ALTITUDE,
+          );
+          const takeoffStopAltitude = takeoffTargetAltitude - 0.05;
+          desiredVerticalSpeed =
+            state.altitude < takeoffStopAltitude ? 1.55 : 0;
+          if (state.altitude >= takeoffStopAltitude) {
             state.autoVertical = null;
             state.warning = null;
           }
@@ -2145,8 +2241,15 @@ export default function FlightSimulator({
       if (state.waypointIndex !== lastAnnouncedWaypointRef.current) {
         lastAnnouncedWaypointRef.current = state.waypointIndex;
         if (activeWaypoint && state.phase === "running") {
+          const previousWaypoint =
+            mission[state.waypointIndex - 1];
+          const enteringAttiMode =
+            isAttiWaypoint(activeWaypoint) &&
+            !isAttiWaypoint(previousWaypoint);
           setAnnouncement(
-            `${activeWaypoint.stage}, 다음 목표: ${activeWaypoint.label}`,
+            enteringAttiMode
+              ? `ATTI 모드로 전환합니다. GPS 위치 제동이 해제되어 관성과 바람에 기체가 계속 움직입니다. 다음 목표: ${activeWaypoint.label}`
+              : `${activeWaypoint.stage}, 다음 목표: ${activeWaypoint.label}`,
           );
         }
       }
@@ -2178,6 +2281,10 @@ export default function FlightSimulator({
 
   const activeWaypoint =
     mission[Math.min(snapshot.waypointIndex, mission.length - 1)];
+  const attiModeActive =
+    isAttiWaypoint(activeWaypoint) &&
+    snapshot.phase !== "completed" &&
+    snapshot.phase !== "crashed";
   const stageNumber = activeWaypoint?.stageNumber ?? stageTotal;
   const progress = clamp(snapshot.waypointIndex / mission.length, 0, 1);
   const targetHold = activeWaypoint?.hold ?? 0.8;
@@ -2386,7 +2493,10 @@ export default function FlightSimulator({
       <div className="flight-hud">
         <section className="objective-card" aria-label="현재 비행 목표">
           <div className="objective-heading">
-            <span>STAGE {stageNumber} / {stageTotal}</span>
+            <span>
+              {attiModeActive ? "ATTI · " : ""}
+              STAGE {stageNumber} / {stageTotal}
+            </span>
             <b>{Math.min(snapshot.waypointIndex + 1, mission.length)} / {mission.length}</b>
           </div>
           <h1>{activeWaypoint?.stage ?? "훈련 완료"}</h1>
@@ -2440,12 +2550,21 @@ export default function FlightSimulator({
         PILOT VIEW · 조종자 시점
       </div>
 
-      {windActive && (
+      {attiModeActive && snapshot.phase === "running" ? (
+        <div
+          className="wind-indicator"
+          role="status"
+          aria-label="ATTI 모드: GPS 위치 제동 해제, 관성 비행"
+        >
+          <span aria-hidden="true">ATTI</span>
+          GPS 제동 해제 · 관성 비행
+        </div>
+      ) : windActive ? (
         <div className="wind-indicator" role="status">
           <span aria-hidden="true">➜</span>
           측풍 동→서 2.4 m/s
         </div>
-      )}
+      ) : null}
 
       {snapshot.warning && snapshot.phase === "running" && (
         <div className="flight-warning" role="status">

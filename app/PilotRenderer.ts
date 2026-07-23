@@ -101,9 +101,9 @@ export function distanceFromPilot(x: number, z: number) {
 
 export function getPilotFocal(width: number, height: number) {
   // 세로형 모바일은 가로 폭이 좁아 같은 계수에서 표식이 소실점에 지나치게
-  // 압축됩니다. 모바일만 시야를 조금 당겨 기체와 라바콘의 거리 단서를
-  // 유지하고, PC에서는 기존 전체 코스 시야를 그대로 사용합니다.
-  const widthRatio = width <= 520 && height > width ? 0.62 : 0.54;
+  // 압축됩니다. 세로형 모바일만 현재 시야보다 약 10% 당기되 좌우
+  // B·D점이 과도하게 잘리지 않는 범위로 제한합니다.
+  const widthRatio = width <= 520 && height > width ? 0.68 : 0.54;
   return Math.min(width * widthRatio, height * 0.96);
 }
 

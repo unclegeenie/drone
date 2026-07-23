@@ -71,16 +71,25 @@ export function drawFieldMiniMap(
   guideMode: MapGuideMode = "full",
 ) {
   const shortLandscape = viewportHeight <= 520 && viewportWidth > 520;
+  const portraitMobile =
+    viewportWidth <= 520 && viewportHeight > viewportWidth;
   const compactMobile = viewportWidth <= 520 || shortLandscape;
+  const expandedMobileHud =
+    portraitMobile && viewportWidth >= 341 && viewportHeight >= 691;
+  const mobileMapScale = expandedMobileHud ? 1.1 : 1;
   const panelWidth = compactMobile
     ? shortLandscape
       ? clamp(viewportWidth * 0.19, 136, 150)
-      : clamp(viewportWidth * 0.42, 146, 158)
+      : expandedMobileHud
+        ? clamp(viewportWidth * 0.46, 160, 174)
+        : clamp(viewportWidth * 0.42, 146, 158)
     : clamp(viewportWidth * 0.2, 176, 260);
   const panelHeight = compactMobile
     ? shortLandscape
       ? clamp(panelWidth * 1.06, 144, 158)
-      : clamp(panelWidth * 1.18, 172, 190)
+      : expandedMobileHud
+        ? clamp(panelWidth * 1.18, 189, 209)
+        : clamp(panelWidth * 1.18, 172, 190)
     : clamp(panelWidth * 1.18, 208, 306);
   const panelX =
     viewportWidth - panelWidth - (viewportWidth <= 760 ? 10 : 24);
@@ -88,16 +97,24 @@ export function drawFieldMiniMap(
     shortLandscape
       ? 94
       : compactMobile
-      ? 178
+      ? expandedMobileHud
+        ? 204
+        : 178
       : viewportWidth <= 760
         ? 148
         : 164;
-  const headerHeight = compactMobile ? 24 : 27;
-  const footerHeight = compactMobile ? 27 : 32;
-  const mapX = panelX + 9;
+  const headerHeight = expandedMobileHud ? 26 : compactMobile ? 24 : 27;
+  const footerHeight = expandedMobileHud ? 30 : compactMobile ? 27 : 32;
+  const panelInset = expandedMobileHud ? 10 : 9;
+  const mapBottomGap = expandedMobileHud ? 8 : 7;
+  const mapX = panelX + panelInset;
   const mapY = panelY + headerHeight;
-  const mapWidth = panelWidth - 18;
-  const mapHeight = panelHeight - headerHeight - footerHeight - 7;
+  const mapWidth = panelWidth - panelInset * 2;
+  const mapHeight =
+    panelHeight - headerHeight - footerHeight - mapBottomGap;
+  const mapLabelFontSize = compactMobile
+    ? 8.5 * mobileMapScale
+    : 9.5;
   const localWorldSize = LOCAL_MAP_HALF_RANGE * 2;
   const scale = Math.min(
     mapWidth / localWorldSize,
@@ -141,19 +158,21 @@ export function drawFieldMiniMap(
   context.stroke();
 
   context.fillStyle = "#edf7f8";
-  context.font = `800 ${compactMobile ? 9 : 10.5}px Pretendard, sans-serif`;
+  context.font = `800 ${
+    compactMobile ? 9 * mobileMapScale : 10.5
+  }px Pretendard, sans-serif`;
   context.textAlign = "left";
   context.textBaseline = "middle";
   context.fillText(
     "주변 지도 ±10m",
-    panelX + 11,
+    panelX + 11 * mobileMapScale,
     panelY + headerHeight / 2,
   );
   context.fillStyle = "#ffd24a";
   context.textAlign = "right";
   context.fillText(
     "N ↑",
-    panelX + panelWidth - 11,
+    panelX + panelWidth - 11 * mobileMapScale,
     panelY + headerHeight / 2,
   );
 
@@ -287,7 +306,7 @@ export function drawFieldMiniMap(
       bottomRight.y - topLeft.y,
     );
     context.fillStyle = "#ffffff";
-    context.font = `800 ${compactMobile ? 8.5 : 9.5}px Pretendard, sans-serif`;
+    context.font = `800 ${mapLabelFontSize}px Pretendard, sans-serif`;
     context.textAlign = "center";
     context.textBaseline = "middle";
     context.fillText(
@@ -361,7 +380,7 @@ export function drawFieldMiniMap(
       context.arc(
         point.x + duplicateOffset,
         point.y - duplicateOffset,
-        active ? 4.2 : 2.2,
+        (active ? 4.2 : 2.2) * mobileMapScale,
         0,
         Math.PI * 2,
       );
@@ -375,7 +394,13 @@ export function drawFieldMiniMap(
         context.strokeStyle = "rgba(255, 210, 74, 0.55)";
         context.lineWidth = 1.2;
         context.beginPath();
-        context.arc(point.x, point.y, 7, 0, Math.PI * 2);
+        context.arc(
+          point.x,
+          point.y,
+          7 * mobileMapScale,
+          0,
+          Math.PI * 2,
+        );
         context.stroke();
       }
     }
@@ -387,12 +412,24 @@ export function drawFieldMiniMap(
     const point = mapPoint(activeWaypoint.x, activeWaypoint.z);
     context.fillStyle = "#ffd24a";
     context.beginPath();
-    context.arc(point.x, point.y, 4.2, 0, Math.PI * 2);
+    context.arc(
+      point.x,
+      point.y,
+      4.2 * mobileMapScale,
+      0,
+      Math.PI * 2,
+    );
     context.fill();
     context.strokeStyle = "rgba(255, 210, 74, 0.58)";
     context.lineWidth = 1.2;
     context.beginPath();
-    context.arc(point.x, point.y, 7, 0, Math.PI * 2);
+    context.arc(
+      point.x,
+      point.y,
+      7 * mobileMapScale,
+      0,
+      Math.PI * 2,
+    );
     context.stroke();
   }
 
@@ -400,7 +437,8 @@ export function drawFieldMiniMap(
     if (!pointIsVisible(marker.x, marker.z, 1)) return;
     const point = mapPoint(marker.x, marker.z);
     const intensity = getDownwashIntensity(state, marker);
-    const markerSize = intensity > 0.35 ? 4.8 : 3.8;
+    const markerSize =
+      (intensity > 0.35 ? 4.8 : 3.8) * mobileMapScale;
     const droneDistance = Math.hypot(
       marker.x - state.x,
       marker.z - state.z,
@@ -413,7 +451,7 @@ export function drawFieldMiniMap(
       context.arc(
         point.x,
         point.y,
-        markerSize + 3 + intensity * 2,
+        markerSize + (3 + intensity * 2) * mobileMapScale,
         0,
         Math.PI * 2,
       );
@@ -443,20 +481,30 @@ export function drawFieldMiniMap(
     context.closePath();
     context.fill();
     context.fillStyle = "#fff7e7";
-    context.font = `800 ${compactMobile ? 8.5 : 9.5}px Pretendard, sans-serif`;
+    context.font = `800 ${mapLabelFontSize}px Pretendard, sans-serif`;
     context.textAlign = "left";
     context.textBaseline = "middle";
-    context.fillText(marker.id, point.x + markerSize + 1.5, point.y);
+    context.fillText(
+      marker.id,
+      point.x + markerSize + 1.5 * mobileMapScale,
+      point.y,
+    );
   });
 
   const home = mapPoint(FIELD.homeX, FIELD.homeZ);
   if (pointIsVisible(FIELD.homeX, FIELD.homeZ, 0.8)) {
     context.fillStyle = "rgba(255, 255, 255, 0.92)";
-    context.font = `800 ${compactMobile ? 8.5 : 9.5}px Pretendard, sans-serif`;
+    context.font = `800 ${mapLabelFontSize}px Pretendard, sans-serif`;
     context.textAlign = "center";
     context.textBaseline = "middle";
     context.beginPath();
-    context.arc(home.x, home.y, 5.8, 0, Math.PI * 2);
+    context.arc(
+      home.x,
+      home.y,
+      5.8 * mobileMapScale,
+      0,
+      Math.PI * 2,
+    );
     context.fill();
     context.fillStyle = "#143440";
     context.fillText("H", home.x, home.y + 0.5);
@@ -466,10 +514,16 @@ export function drawFieldMiniMap(
   if (pointIsVisible(PILOT.x, PILOT.z, 0.8)) {
     context.fillStyle = "#63cfed";
     context.beginPath();
-    context.arc(pilot.x, pilot.y, 5.2, 0, Math.PI * 2);
+    context.arc(
+      pilot.x,
+      pilot.y,
+      5.2 * mobileMapScale,
+      0,
+      Math.PI * 2,
+    );
     context.fill();
     context.fillStyle = "#062430";
-    context.font = `800 ${compactMobile ? 8.5 : 9.5}px Pretendard, sans-serif`;
+    context.font = `800 ${mapLabelFontSize}px Pretendard, sans-serif`;
     context.fillText("P", pilot.x, pilot.y + 0.5);
   }
 
@@ -488,7 +542,7 @@ export function drawFieldMiniMap(
     if (!activeWaypointVisible) {
       const deltaX = (activeWaypoint.x - state.x) * scale;
       const deltaY = -(activeWaypoint.z - state.z) * scale;
-      const edgeInset = 9;
+      const edgeInset = 9 * mobileMapScale;
       const edgeExtent =
         LOCAL_MAP_HALF_RANGE * scale - edgeInset;
       const edgeRatio = Math.min(
@@ -512,6 +566,7 @@ export function drawFieldMiniMap(
       context.save();
       context.translate(edgeX, edgeY);
       context.rotate(directionAngle);
+      context.scale(mobileMapScale, mobileMapScale);
       context.fillStyle = "#ffd24a";
       context.beginPath();
       context.moveTo(6, 0);
@@ -522,13 +577,13 @@ export function drawFieldMiniMap(
       context.restore();
 
       context.fillStyle = "#fff0a8";
-      context.font = `800 ${compactMobile ? 8.5 : 9.5}px Pretendard, sans-serif`;
+      context.font = `800 ${mapLabelFontSize}px Pretendard, sans-serif`;
       context.textAlign = "center";
       context.textBaseline = "middle";
       context.fillText(
         `${Math.round(targetDistance)}m`,
-        edgeX - directionX * 13,
-        edgeY - directionY * 13,
+        edgeX - directionX * 13 * mobileMapScale,
+        edgeY - directionY * 13 * mobileMapScale,
       );
     } else if (activeWaypoint.targetYaw !== undefined) {
       const yawRadians = (activeWaypoint.targetYaw * Math.PI) / 180;
@@ -563,6 +618,7 @@ export function drawFieldMiniMap(
   context.save();
   context.translate(drone.x, drone.y);
   context.rotate((state.yaw * Math.PI) / 180);
+  context.scale(mobileMapScale, mobileMapScale);
   context.shadowColor = "rgba(99, 207, 237, 0.9)";
   context.shadowBlur = 9;
   context.fillStyle = "#f7fdff";
@@ -584,7 +640,7 @@ export function drawFieldMiniMap(
     footerHeight - 1,
   );
   context.fillStyle = "#dcebed";
-  context.font = `700 ${compactMobile ? 8.5 : 9.5}px Pretendard, sans-serif`;
+  context.font = `700 ${mapLabelFontSize}px Pretendard, sans-serif`;
   context.textAlign = "left";
   context.textBaseline = "middle";
   const goalNumber = Math.min(state.waypointIndex + 1, mission.length);
@@ -596,7 +652,7 @@ export function drawFieldMiniMap(
         : `고도 ${state.altitude.toFixed(1)}m · 완료`;
   context.fillText(
     footer,
-    panelX + 10,
+    panelX + 10 * mobileMapScale,
     panelY + panelHeight - footerHeight / 2,
   );
   context.restore();
