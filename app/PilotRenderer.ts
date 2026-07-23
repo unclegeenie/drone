@@ -100,9 +100,11 @@ export function distanceFromPilot(x: number, z: number) {
 }
 
 export function getPilotFocal(width: number, height: number) {
-  // 시험장과 기체가 기존보다 약 8% 가까이 보이도록 시야를 살짝 당깁니다.
-  // 전체 코스가 화면 안에 남도록 과도한 줌은 피합니다.
-  return Math.min(width * 0.54, height * 0.96);
+  // 세로형 모바일은 가로 폭이 좁아 같은 계수에서 표식이 소실점에 지나치게
+  // 압축됩니다. 모바일만 시야를 조금 당겨 기체와 라바콘의 거리 단서를
+  // 유지하고, PC에서는 기존 전체 코스 시야를 그대로 사용합니다.
+  const widthRatio = width <= 520 && height > width ? 0.62 : 0.54;
+  return Math.min(width * widthRatio, height * 0.96);
 }
 
 function toViewSpace(x: number, z: number) {
@@ -515,7 +517,8 @@ function drawDownwashGround(
 
   context.save();
   context.lineCap = "round";
-  for (let index = 0; index < 42; index += 1) {
+  const debrisCount = width <= 520 ? 18 : width <= 760 ? 28 : 42;
+  for (let index = 0; index < debrisCount; index += 1) {
     const angle = index * 2.399963 + (index % 3) * 0.07;
     const radialProgress = 0.24 + ((index * 7) % 29) / 39;
     const radialDistance = footprint * radialProgress;
@@ -690,15 +693,23 @@ function drawCourseCone(
     "#e94747",
     "#d8f5f4",
   ];
-  const middleRibbon = (ribbonColors.length - 1) / 2;
-  ribbonColors.forEach((color, ribbonIndex) => {
+  // 가까이 접근하면 요청하신 12개의 수술을 모두 보여주고, 원거리
+  // 모바일에서는 투영 폭에 맞춰 수를 줄여 흰 선 뭉침을 방지합니다.
+  const visibleRibbonColors =
+    width <= 520 && coneHeight < 24
+      ? ribbonColors.slice(0, 5)
+      : width <= 520 && coneHeight < 36
+        ? ribbonColors.slice(0, 8)
+        : ribbonColors;
+  const middleRibbon = (visibleRibbonColors.length - 1) / 2;
+  visibleRibbonColors.forEach((color, ribbonIndex) => {
     const lane =
       (ribbonIndex - middleRibbon) /
       Math.max(1, middleRibbon);
     const directionalAngle = awayAngle + lane * 0.1;
     const radialAngle =
       fallbackAngle +
-      (Math.PI * 2 * ribbonIndex) / ribbonColors.length;
+      (Math.PI * 2 * ribbonIndex) / visibleRibbonColors.length;
     let flowX =
       Math.cos(directionalAngle) * (1 - centeredBlend) +
       Math.cos(radialAngle) * centeredBlend;
@@ -877,7 +888,12 @@ function drawCourseRoute(
   context.setLineDash([7, 8]);
   context.lineCap = "round";
 
-  for (let index = 1; index < mission.length; index += 1) {
+  const compactMobile = width <= 520;
+  const routeStart = compactMobile ? Math.max(1, currentIndex) : 1;
+  const routeEnd = compactMobile
+    ? Math.min(mission.length, currentIndex + 3)
+    : mission.length;
+  for (let index = routeStart; index < routeEnd; index += 1) {
     const previous = projectWorld(
       mission[index - 1].x,
       mission[index - 1].landing ? 0 : mission[index - 1].altitude,
@@ -1626,14 +1642,20 @@ export function drawPilotScene(
     drawCourseRoute(context, width, height, mission, state.waypointIndex);
   }
 
+  const compactMobile = width <= 520;
   const markerStart =
     guideMode === "target"
       ? state.waypointIndex
-      : Math.max(0, state.waypointIndex - 1);
+      : compactMobile
+        ? state.waypointIndex
+        : Math.max(0, state.waypointIndex - 1);
   const markerEnd =
     guideMode === "target"
       ? Math.min(mission.length, state.waypointIndex + 1)
-      : Math.min(mission.length, state.waypointIndex + 5);
+      : Math.min(
+          mission.length,
+          state.waypointIndex + (compactMobile ? 2 : 5),
+        );
   const activeMarker = mission[state.waypointIndex];
   if (guideMode !== "off") {
     for (let index = markerEnd - 1; index >= markerStart; index -= 1) {

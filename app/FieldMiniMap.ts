@@ -4,7 +4,6 @@ import {
   COURSE_POINTS,
   EMERGENCY_PADS,
   FIELD_BOUNDS,
-  MAP_BOUNDS,
   downwashFootprint,
   getDownwashIntensity,
 } from "./CourseGeometry";
@@ -30,8 +29,8 @@ type MapFlightState = {
 type MapGuideMode = "full" | "target" | "off";
 
 const FIELD = FIELD_BOUNDS;
-const MAP = MAP_BOUNDS;
 const PILOT = COURSE_POINTS.P;
+const LOCAL_MAP_HALF_RANGE = 10;
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -75,42 +74,53 @@ export function drawFieldMiniMap(
   const compactMobile = viewportWidth <= 520 || shortLandscape;
   const panelWidth = compactMobile
     ? shortLandscape
-      ? 112
-      : clamp(viewportWidth * 0.33, 112, 126)
-    : clamp(viewportWidth * 0.17, 148, 220);
+      ? clamp(viewportWidth * 0.19, 136, 150)
+      : clamp(viewportWidth * 0.42, 146, 158)
+    : clamp(viewportWidth * 0.2, 176, 260);
   const panelHeight = compactMobile
     ? shortLandscape
-      ? 132
-      : clamp(panelWidth * 1.16, 132, 146)
-    : clamp(panelWidth * 1.18, 174, 260);
+      ? clamp(panelWidth * 1.06, 144, 158)
+      : clamp(panelWidth * 1.18, 172, 190)
+    : clamp(panelWidth * 1.18, 208, 306);
   const panelX =
     viewportWidth - panelWidth - (viewportWidth <= 760 ? 10 : 24);
   const panelY =
     shortLandscape
-      ? 100
+      ? 94
       : compactMobile
-      ? 126
+      ? 178
       : viewportWidth <= 760
         ? 148
         : 164;
-  const headerHeight = compactMobile ? 22 : 25;
-  const footerHeight = compactMobile ? 24 : 31;
+  const headerHeight = compactMobile ? 24 : 27;
+  const footerHeight = compactMobile ? 27 : 32;
   const mapX = panelX + 9;
   const mapY = panelY + headerHeight;
   const mapWidth = panelWidth - 18;
   const mapHeight = panelHeight - headerHeight - footerHeight - 7;
-  const worldWidth = MAP.maxX - MAP.minX;
-  const worldHeight = MAP.maxZ - MAP.minZ;
-  const scale = Math.min(mapWidth / worldWidth, mapHeight / worldHeight);
-  const worldPixelWidth = worldWidth * scale;
-  const worldPixelHeight = worldHeight * scale;
-  const offsetX = mapX + (mapWidth - worldPixelWidth) / 2;
-  const offsetY = mapY + (mapHeight - worldPixelHeight) / 2;
+  const localWorldSize = LOCAL_MAP_HALF_RANGE * 2;
+  const scale = Math.min(
+    mapWidth / localWorldSize,
+    mapHeight / localWorldSize,
+  );
+  const mapCenterX = mapX + mapWidth / 2;
+  const mapCenterY = mapY + mapHeight / 2;
+  const visibleBounds = {
+    minX: state.x - LOCAL_MAP_HALF_RANGE,
+    maxX: state.x + LOCAL_MAP_HALF_RANGE,
+    minZ: state.z - LOCAL_MAP_HALF_RANGE,
+    maxZ: state.z + LOCAL_MAP_HALF_RANGE,
+  };
 
   const mapPoint = (x: number, z: number) => ({
-    x: offsetX + (x - MAP.minX) * scale,
-    y: offsetY + (MAP.maxZ - z) * scale,
+    x: mapCenterX + (x - state.x) * scale,
+    y: mapCenterY - (z - state.z) * scale,
   });
+  const pointIsVisible = (x: number, z: number, margin = 0) =>
+    x >= visibleBounds.minX - margin &&
+    x <= visibleBounds.maxX + margin &&
+    z >= visibleBounds.minZ - margin &&
+    z <= visibleBounds.maxZ + margin;
 
   context.save();
   context.shadowColor = "rgba(0, 0, 0, 0.42)";
@@ -131,52 +141,81 @@ export function drawFieldMiniMap(
   context.stroke();
 
   context.fillStyle = "#edf7f8";
-  context.font = `800 ${viewportWidth <= 520 ? 8 : 10}px Pretendard, sans-serif`;
+  context.font = `800 ${compactMobile ? 9 : 10.5}px Pretendard, sans-serif`;
   context.textAlign = "left";
   context.textBaseline = "middle";
-  context.fillText("전체 비행장", panelX + 11, panelY + 13);
+  context.fillText(
+    "주변 지도 ±10m",
+    panelX + 11,
+    panelY + headerHeight / 2,
+  );
   context.fillStyle = "#ffd24a";
   context.textAlign = "right";
-  context.fillText("N ↑", panelX + panelWidth - 11, panelY + 13);
+  context.fillText(
+    "N ↑",
+    panelX + panelWidth - 11,
+    panelY + headerHeight / 2,
+  );
 
   roundedRect(context, mapX, mapY, mapWidth, mapHeight, 8);
   context.save();
   context.clip();
+  context.fillStyle = "rgba(8, 36, 41, 0.98)";
+  context.fillRect(mapX, mapY, mapWidth, mapHeight);
+
   const mapGradient = context.createLinearGradient(0, mapY, 0, mapY + mapHeight);
   mapGradient.addColorStop(0, "rgba(38, 94, 72, 0.98)");
   mapGradient.addColorStop(1, "rgba(17, 57, 49, 0.98)");
-  context.fillStyle = mapGradient;
-  context.fillRect(mapX, mapY, mapWidth, mapHeight);
-
-  context.strokeStyle = "rgba(222, 244, 229, 0.14)";
-  context.lineWidth = 0.75;
-  for (
-    let x = Math.ceil(FIELD.minX / 5) * 5;
-    x <= FIELD.maxX;
-    x += 5
-  ) {
-    const near = mapPoint(x, FIELD.minZ);
-    const far = mapPoint(x, FIELD.maxZ);
-    context.beginPath();
-    context.moveTo(near.x, near.y);
-    context.lineTo(far.x, far.y);
-    context.stroke();
-  }
-  for (
-    let z = Math.ceil(FIELD.minZ / 5) * 5;
-    z <= FIELD.maxZ;
-    z += 5
-  ) {
-    const left = mapPoint(FIELD.minX, z);
-    const right = mapPoint(FIELD.maxX, z);
-    context.beginPath();
-    context.moveTo(left.x, left.y);
-    context.lineTo(right.x, right.y);
-    context.stroke();
-  }
-
   const fieldTopLeft = mapPoint(FIELD.minX, FIELD.maxZ);
   const fieldBottomRight = mapPoint(FIELD.maxX, FIELD.minZ);
+  context.fillStyle = mapGradient;
+  context.fillRect(
+    fieldTopLeft.x,
+    fieldTopLeft.y,
+    fieldBottomRight.x - fieldTopLeft.x,
+    fieldBottomRight.y - fieldTopLeft.y,
+  );
+
+  const gridMinX = Math.max(visibleBounds.minX, FIELD.minX);
+  const gridMaxX = Math.min(visibleBounds.maxX, FIELD.maxX);
+  const gridMinZ = Math.max(visibleBounds.minZ, FIELD.minZ);
+  const gridMaxZ = Math.min(visibleBounds.maxZ, FIELD.maxZ);
+  const drawGrid = (
+    step: number,
+    color: string,
+    lineWidth: number,
+  ) => {
+    if (gridMinX > gridMaxX || gridMinZ > gridMaxZ) return;
+    context.strokeStyle = color;
+    context.lineWidth = lineWidth;
+    for (
+      let x = Math.ceil(gridMinX / step) * step;
+      x <= gridMaxX;
+      x += step
+    ) {
+      const near = mapPoint(x, gridMinZ);
+      const far = mapPoint(x, gridMaxZ);
+      context.beginPath();
+      context.moveTo(near.x, near.y);
+      context.lineTo(far.x, far.y);
+      context.stroke();
+    }
+    for (
+      let z = Math.ceil(gridMinZ / step) * step;
+      z <= gridMaxZ;
+      z += step
+    ) {
+      const left = mapPoint(gridMinX, z);
+      const right = mapPoint(gridMaxX, z);
+      context.beginPath();
+      context.moveTo(left.x, left.y);
+      context.lineTo(right.x, right.y);
+      context.stroke();
+    }
+  };
+  drawGrid(2, "rgba(222, 244, 229, 0.09)", 0.65);
+  drawGrid(5, "rgba(235, 249, 239, 0.22)", 0.9);
+
   context.strokeStyle = "rgba(255, 255, 255, 0.72)";
   context.lineWidth = 1.2;
   context.setLineDash([4, 3]);
@@ -229,6 +268,7 @@ export function drawFieldMiniMap(
   );
 
   EMERGENCY_PADS.forEach((pad) => {
+    if (!pointIsVisible(pad.x, pad.z, 1.2)) return;
     const topLeft = mapPoint(pad.x - 1, pad.z + 1);
     const bottomRight = mapPoint(pad.x + 1, pad.z - 1);
     context.fillStyle = "rgba(242, 77, 49, 0.9)";
@@ -247,7 +287,7 @@ export function drawFieldMiniMap(
       bottomRight.y - topLeft.y,
     );
     context.fillStyle = "#ffffff";
-    context.font = "900 6px Pretendard, sans-serif";
+    context.font = `800 ${compactMobile ? 8.5 : 9.5}px Pretendard, sans-serif`;
     context.textAlign = "center";
     context.textBaseline = "middle";
     context.fillText(
@@ -260,8 +300,8 @@ export function drawFieldMiniMap(
   if (state.motorsArmed) {
     const droneGround = mapPoint(state.x, state.z);
     const footprint = downwashFootprint(state.altitude) * scale;
-    context.fillStyle = "rgba(88, 218, 235, 0.09)";
-    context.strokeStyle = "rgba(88, 218, 235, 0.52)";
+    context.fillStyle = "rgba(88, 218, 235, 0.06)";
+    context.strokeStyle = "rgba(88, 218, 235, 0.38)";
     context.lineWidth = 1;
     context.setLineDash([3, 3]);
     context.beginPath();
@@ -279,9 +319,18 @@ export function drawFieldMiniMap(
 
   const activeWaypoint =
     mission[Math.min(state.waypointIndex, mission.length - 1)];
+  const activeWaypointVisible = Boolean(
+    activeWaypoint &&
+      pointIsVisible(activeWaypoint.x, activeWaypoint.z),
+  );
 
   if (guideMode === "full") {
-    for (let index = 1; index < mission.length; index += 1) {
+    const routeStart = Math.max(0, state.waypointIndex - 1);
+    const routeEnd = Math.min(
+      mission.length - 1,
+      state.waypointIndex + 2,
+    );
+    for (let index = routeStart + 1; index <= routeEnd; index += 1) {
       const previous = mapPoint(mission[index - 1].x, mission[index - 1].z);
       const current = mapPoint(mission[index].x, mission[index].z);
       context.strokeStyle =
@@ -295,7 +344,9 @@ export function drawFieldMiniMap(
       context.stroke();
     }
 
-    mission.forEach((waypoint, index) => {
+    for (let index = routeStart; index <= routeEnd; index += 1) {
+      const waypoint = mission[index];
+      if (!waypoint || !pointIsVisible(waypoint.x, waypoint.z, 0.8)) continue;
       const point = mapPoint(waypoint.x, waypoint.z);
       const active = index === state.waypointIndex;
       const complete = index < state.waypointIndex;
@@ -327,8 +378,12 @@ export function drawFieldMiniMap(
         context.arc(point.x, point.y, 7, 0, Math.PI * 2);
         context.stroke();
       }
-    });
-  } else if (guideMode === "target" && activeWaypoint) {
+    }
+  } else if (
+    guideMode === "target" &&
+    activeWaypoint &&
+    activeWaypointVisible
+  ) {
     const point = mapPoint(activeWaypoint.x, activeWaypoint.z);
     context.fillStyle = "#ffd24a";
     context.beginPath();
@@ -342,9 +397,10 @@ export function drawFieldMiniMap(
   }
 
   COURSE_CONES.forEach((marker) => {
+    if (!pointIsVisible(marker.x, marker.z, 1)) return;
     const point = mapPoint(marker.x, marker.z);
     const intensity = getDownwashIntensity(state, marker);
-    const markerSize = intensity > 0.35 ? 4 : 3.1;
+    const markerSize = intensity > 0.35 ? 4.8 : 3.8;
     const droneDistance = Math.hypot(
       marker.x - state.x,
       marker.z - state.z,
@@ -387,31 +443,35 @@ export function drawFieldMiniMap(
     context.closePath();
     context.fill();
     context.fillStyle = "#fff7e7";
-    context.font = "900 6px Pretendard, sans-serif";
+    context.font = `800 ${compactMobile ? 8.5 : 9.5}px Pretendard, sans-serif`;
     context.textAlign = "left";
     context.textBaseline = "middle";
     context.fillText(marker.id, point.x + markerSize + 1.5, point.y);
   });
 
   const home = mapPoint(FIELD.homeX, FIELD.homeZ);
-  context.fillStyle = "rgba(255, 255, 255, 0.92)";
-  context.font = "800 7px Pretendard, sans-serif";
-  context.textAlign = "center";
-  context.textBaseline = "middle";
-  context.beginPath();
-  context.arc(home.x, home.y, 5.5, 0, Math.PI * 2);
-  context.fill();
-  context.fillStyle = "#143440";
-  context.fillText("H", home.x, home.y + 0.5);
+  if (pointIsVisible(FIELD.homeX, FIELD.homeZ, 0.8)) {
+    context.fillStyle = "rgba(255, 255, 255, 0.92)";
+    context.font = `800 ${compactMobile ? 8.5 : 9.5}px Pretendard, sans-serif`;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.beginPath();
+    context.arc(home.x, home.y, 5.8, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = "#143440";
+    context.fillText("H", home.x, home.y + 0.5);
+  }
 
   const pilot = mapPoint(PILOT.x, PILOT.z);
-  context.fillStyle = "#63cfed";
-  context.beginPath();
-  context.arc(pilot.x, pilot.y, 4.8, 0, Math.PI * 2);
-  context.fill();
-  context.fillStyle = "#062430";
-  context.font = "900 7px Pretendard, sans-serif";
-  context.fillText("P", pilot.x, pilot.y + 0.5);
+  if (pointIsVisible(PILOT.x, PILOT.z, 0.8)) {
+    context.fillStyle = "#63cfed";
+    context.beginPath();
+    context.arc(pilot.x, pilot.y, 5.2, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = "#062430";
+    context.font = `800 ${compactMobile ? 8.5 : 9.5}px Pretendard, sans-serif`;
+    context.fillText("P", pilot.x, pilot.y + 0.5);
+  }
 
   const drone = mapPoint(state.x, state.z);
   if (guideMode !== "off" && activeWaypoint) {
@@ -425,7 +485,52 @@ export function drawFieldMiniMap(
     context.stroke();
     context.setLineDash([]);
 
-    if (activeWaypoint.targetYaw !== undefined) {
+    if (!activeWaypointVisible) {
+      const deltaX = (activeWaypoint.x - state.x) * scale;
+      const deltaY = -(activeWaypoint.z - state.z) * scale;
+      const edgeInset = 9;
+      const edgeExtent =
+        LOCAL_MAP_HALF_RANGE * scale - edgeInset;
+      const edgeRatio = Math.min(
+        edgeExtent / Math.max(Math.abs(deltaX), 0.001),
+        edgeExtent / Math.max(Math.abs(deltaY), 0.001),
+      );
+      const edgeX = drone.x + deltaX * edgeRatio;
+      const edgeY = drone.y + deltaY * edgeRatio;
+      const directionLength = Math.max(
+        Math.hypot(deltaX, deltaY),
+        0.001,
+      );
+      const directionX = deltaX / directionLength;
+      const directionY = deltaY / directionLength;
+      const directionAngle = Math.atan2(deltaY, deltaX);
+      const targetDistance = Math.hypot(
+        activeWaypoint.x - state.x,
+        activeWaypoint.z - state.z,
+      );
+
+      context.save();
+      context.translate(edgeX, edgeY);
+      context.rotate(directionAngle);
+      context.fillStyle = "#ffd24a";
+      context.beginPath();
+      context.moveTo(6, 0);
+      context.lineTo(-4, -4);
+      context.lineTo(-4, 4);
+      context.closePath();
+      context.fill();
+      context.restore();
+
+      context.fillStyle = "#fff0a8";
+      context.font = `800 ${compactMobile ? 8.5 : 9.5}px Pretendard, sans-serif`;
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillText(
+        `${Math.round(targetDistance)}m`,
+        edgeX - directionX * 13,
+        edgeY - directionY * 13,
+      );
+    } else if (activeWaypoint.targetYaw !== undefined) {
       const yawRadians = (activeWaypoint.targetYaw * Math.PI) / 180;
       const heading = mapPoint(
         activeWaypoint.x + Math.sin(yawRadians) * 6,
@@ -479,21 +584,20 @@ export function drawFieldMiniMap(
     footerHeight - 1,
   );
   context.fillStyle = "#dcebed";
-  context.font = `700 ${viewportWidth <= 520 ? 7 : 8}px Pretendard, sans-serif`;
+  context.font = `700 ${compactMobile ? 8.5 : 9.5}px Pretendard, sans-serif`;
   context.textAlign = "left";
   context.textBaseline = "middle";
   const goalNumber = Math.min(state.waypointIndex + 1, mission.length);
   const footer =
     guideMode === "off"
-      ? `실전 · 기체 ${state.altitude.toFixed(1)}m`
+      ? `고도 ${state.altitude.toFixed(1)}m · 실전`
       : activeWaypoint
-        ? `기체 ${state.altitude.toFixed(1)}m · 목표 ${goalNumber}/${mission.length} ${activeWaypoint.label}`
-        : `기체 ${state.altitude.toFixed(1)}m · 코스 완료`;
+        ? `고도 ${state.altitude.toFixed(1)}m · 목표 ${goalNumber}/${mission.length}`
+        : `고도 ${state.altitude.toFixed(1)}m · 완료`;
   context.fillText(
     footer,
     panelX + 10,
     panelY + panelHeight - footerHeight / 2,
-    panelWidth - 20,
   );
   context.restore();
 }

@@ -45,9 +45,9 @@ const GUIDE_MODE_LABELS: Record<PilotGuideMode, string> = {
 };
 
 const GUIDE_MODE_DESCRIPTIONS: Record<PilotGuideMode, string> = {
-  full: "경로·공간 가이드와 전체 지도를 표시합니다.",
-  target: "현재 목표 공간과 전체 지도만 표시합니다.",
-  off: "비행 가이드를 숨기고 전체 지도만 표시합니다.",
+  full: "경로·공간 가이드와 기체 주변 지도를 표시합니다.",
+  target: "현재 목표 공간과 기체 주변 지도만 표시합니다.",
+  off: "비행 가이드를 숨기고 기체 주변 지도만 표시합니다.",
 };
 
 const NEXT_GUIDE_MODE: Record<PilotGuideMode, PilotGuideMode> = {
@@ -117,6 +117,12 @@ type VirtualAxes = {
 
 type VirtualStickSide = "left" | "right";
 
+type VirtualPointerState = {
+  pointerId: number;
+  originX: number;
+  originY: number;
+};
+
 const FIELD = FIELD_BOUNDS;
 
 const COURSE_STAGE_LABELS: Record<string, string> = {
@@ -133,12 +139,22 @@ const COURSE_STAGE_LABELS: Record<string, string> = {
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
+const MAX_HORIZONTAL_SPEED = 2.6;
+const MOBILE_AXIS_DEADZONE = 0.06;
+const USB_AXIS_DEADZONE = 0.08;
+const HORIZONTAL_EXPO = 0.65;
+const YAW_EXPO = 0.5;
+const THROTTLE_EXPO = 0.45;
+
 const smoothstep = (edge0: number, edge1: number, value: number) => {
   const progress = clamp((value - edge0) / (edge1 - edge0), 0, 1);
   return progress * progress * (3 - 2 * progress);
 };
 
-const signedSpeedRatio = (value: number, maximum = 4.5) => {
+const signedSpeedRatio = (
+  value: number,
+  maximum = MAX_HORIZONTAL_SPEED,
+) => {
   if (Math.abs(value) <= 0.12) return 0;
   return (
     Math.sign(value) *
@@ -856,6 +872,37 @@ function deadzone(value: number, zone = 0.12) {
   );
 }
 
+function expo(value: number, amount: number) {
+  const magnitude = Math.abs(value);
+  return (
+    Math.sign(value) *
+    ((1 - amount) * magnitude + amount * magnitude ** 3)
+  );
+}
+
+function shapeAxis(value: number, zone: number, expoAmount: number) {
+  return expo(deadzone(clamp(value, -1, 1), zone), expoAmount);
+}
+
+function shapeRadialAxes(
+  x: number,
+  y: number,
+  zone: number,
+  expoAmount: number,
+): [number, number] {
+  const magnitude = Math.hypot(x, y);
+  if (magnitude <= zone) return [0, 0];
+
+  const clampedMagnitude = Math.min(1, magnitude);
+  const normalizedMagnitude =
+    (clampedMagnitude - zone) / (1 - zone);
+  const shapedMagnitude =
+    (1 - expoAmount) * normalizedMagnitude +
+    expoAmount * normalizedMagnitude ** 3;
+  const scale = shapedMagnitude / magnitude;
+  return [x * scale, y * scale];
+}
+
 function formatTime(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const remainder = Math.floor(seconds % 60);
@@ -1238,7 +1285,9 @@ export default function FlightSimulator({
     roll: 0,
     pitch: 0,
   });
-  const virtualPointersRef = useRef<Record<VirtualStickSide, number | null>>({
+  const virtualPointersRef = useRef<
+    Record<VirtualStickSide, VirtualPointerState | null>
+  >({
     left: null,
     right: null,
   });
@@ -1756,31 +1805,55 @@ export default function FlightSimulator({
         }
 
         const axes = gamepad?.axes ?? [];
+        const [usbRoll, usbPitchDown] = shapeRadialAxes(
+          axes[2] ?? 0,
+          axes[3] ?? 0,
+          USB_AXIS_DEADZONE,
+          HORIZONTAL_EXPO,
+        );
+        const [mobileRoll, mobilePitchDown] = shapeRadialAxes(
+          virtualAxes.roll,
+          virtualAxes.pitch,
+          MOBILE_AXIS_DEADZONE,
+          HORIZONTAL_EXPO,
+        );
+        const usbYaw = shapeAxis(
+          axes[0] ?? 0,
+          USB_AXIS_DEADZONE,
+          YAW_EXPO,
+        );
+        const mobileYaw = shapeAxis(
+          virtualAxes.yaw,
+          MOBILE_AXIS_DEADZONE,
+          YAW_EXPO,
+        );
+        const usbThrottleDown = shapeAxis(
+          axes[1] ?? 0,
+          USB_AXIS_DEADZONE,
+          THROTTLE_EXPO,
+        );
+        const mobileThrottleDown = shapeAxis(
+          virtualAxes.throttle,
+          MOBILE_AXIS_DEADZONE,
+          THROTTLE_EXPO,
+        );
         const pitch = clamp(
-          keyboardPitch -
-            deadzone(axes[3] ?? 0) -
-            deadzone(virtualAxes.pitch),
+          keyboardPitch - usbPitchDown - mobilePitchDown,
           -1,
           1,
         );
         const roll = clamp(
-          keyboardRoll +
-            deadzone(axes[2] ?? 0) +
-            deadzone(virtualAxes.roll),
+          keyboardRoll + usbRoll + mobileRoll,
           -1,
           1,
         );
         const yawInput = clamp(
-          keyboardYaw +
-            deadzone(axes[0] ?? 0) +
-            deadzone(virtualAxes.yaw),
+          keyboardYaw + usbYaw + mobileYaw,
           -1,
           1,
         );
         const throttle = clamp(
-          keyboardThrottle -
-            deadzone(axes[1] ?? 0) -
-            deadzone(virtualAxes.throttle),
+          keyboardThrottle - usbThrottleDown - mobileThrottleDown,
           -1,
           1,
         );
@@ -1790,13 +1863,14 @@ export default function FlightSimulator({
           state.motorsArmed &&
           (state.altitude > 0.12 || state.autoVertical === "takeoff");
         const yawRadians = (state.yaw * Math.PI) / 180;
-        const acceleration = 5 * response;
-        const worldAx =
-          (roll * Math.cos(yawRadians) + pitch * Math.sin(yawRadians)) *
-          acceleration;
-        const worldAz =
-          (pitch * Math.cos(yawRadians) - roll * Math.sin(yawRadians)) *
-          acceleration;
+        const targetVx =
+          (roll * Math.cos(yawRadians) +
+            pitch * Math.sin(yawRadians)) *
+          MAX_HORIZONTAL_SPEED;
+        const targetVz =
+          (pitch * Math.cos(yawRadians) -
+            roll * Math.sin(yawRadians)) *
+          MAX_HORIZONTAL_SPEED;
         const targetYawRate = airborne
           ? yawInput * 55 * response
           : 0;
@@ -1805,8 +1879,33 @@ export default function FlightSimulator({
           (1 - Math.exp(-8 * delta));
 
         if (airborne) {
-          state.vx += worldAx * delta;
-          state.vz += worldAz * delta;
+          const horizontalCommand = Math.hypot(pitch, roll);
+          const velocityErrorX = targetVx - state.vx;
+          const velocityErrorZ = targetVz - state.vz;
+          const velocityError = Math.hypot(
+            velocityErrorX,
+            velocityErrorZ,
+          );
+          const velocityGain =
+            (horizontalCommand > 0.025 ? 2.4 : 3.8) * response;
+          const accelerationLimit =
+            (horizontalCommand > 0.025 ? 2.1 : 2.8) * response;
+          const requestedAcceleration = velocityError * velocityGain;
+          const appliedAcceleration = Math.min(
+            accelerationLimit,
+            requestedAcceleration,
+          );
+
+          if (velocityError > 0.0001) {
+            state.vx +=
+              (velocityErrorX / velocityError) *
+              appliedAcceleration *
+              delta;
+            state.vz +=
+              (velocityErrorZ / velocityError) *
+              appliedAcceleration *
+              delta;
+          }
           state.yaw =
             (state.yaw + state.yawRate * delta + 360) % 360;
         }
@@ -1819,12 +1918,9 @@ export default function FlightSimulator({
           state.vx += (0.65 + Math.sin(state.elapsed * 0.8) * 0.18) * delta;
         }
 
-        const horizontalDamping = Math.exp(-2.5 * delta);
-        state.vx *= horizontalDamping;
-        state.vz *= horizontalDamping;
         const horizontalSpeed = Math.hypot(state.vx, state.vz);
-        if (horizontalSpeed > 4.5) {
-          const speedScale = 4.5 / horizontalSpeed;
+        if (horizontalSpeed > MAX_HORIZONTAL_SPEED) {
+          const speedScale = MAX_HORIZONTAL_SPEED / horizontalSpeed;
           state.vx *= speedScale;
           state.vz *= speedScale;
         }
@@ -2103,24 +2199,25 @@ export default function FlightSimulator({
     event: ReactPointerEvent<HTMLButtonElement>,
   ) => {
     event.preventDefault();
+    const pointer = virtualPointersRef.current[side];
+    if (!pointer || pointer.pointerId !== event.pointerId) return;
+
     const rect = event.currentTarget.getBoundingClientRect();
-    const inputRadius = Math.max(1, Math.min(rect.width, rect.height) * 0.29);
-    let x = (event.clientX - (rect.left + rect.width / 2)) / inputRadius;
-    let y = (event.clientY - (rect.top + rect.height / 2)) / inputRadius;
+    const inputRadius = Math.max(1, Math.min(rect.width, rect.height) * 0.36);
+    let x = (event.clientX - pointer.originX) / inputRadius;
+    let y = (event.clientY - pointer.originY) / inputRadius;
     const magnitude = Math.hypot(x, y);
     if (magnitude > 1) {
       x /= magnitude;
       y /= magnitude;
     }
 
-    const curve = (value: number) =>
-      Math.sign(value) * Math.pow(Math.abs(value), 1.25);
     if (side === "left") {
-      virtualAxesRef.current.yaw = curve(x);
-      virtualAxesRef.current.throttle = curve(y);
+      virtualAxesRef.current.yaw = x;
+      virtualAxesRef.current.throttle = y;
     } else {
-      virtualAxesRef.current.roll = curve(x);
-      virtualAxesRef.current.pitch = curve(y);
+      virtualAxesRef.current.roll = x;
+      virtualAxesRef.current.pitch = y;
     }
 
     event.currentTarget.style.setProperty(
@@ -2144,16 +2241,32 @@ export default function FlightSimulator({
     const side = getVirtualStickSide(event);
     event.preventDefault();
     if (virtualPointersRef.current[side] !== null) return;
-    virtualPointersRef.current[side] = event.pointerId;
+    virtualPointersRef.current[side] = {
+      pointerId: event.pointerId,
+      originX: event.clientX,
+      originY: event.clientY,
+    };
     event.currentTarget.setPointerCapture(event.pointerId);
-    updateVirtualStick(side, event);
+    if (side === "left") {
+      virtualAxesRef.current.yaw = 0;
+      virtualAxesRef.current.throttle = 0;
+    } else {
+      virtualAxesRef.current.roll = 0;
+      virtualAxesRef.current.pitch = 0;
+    }
+    event.currentTarget.style.setProperty("--stick-x", "0px");
+    event.currentTarget.style.setProperty("--stick-y", "0px");
   };
 
   const moveVirtualStick = (
     event: ReactPointerEvent<HTMLButtonElement>,
   ) => {
     const side = getVirtualStickSide(event);
-    if (virtualPointersRef.current[side] !== event.pointerId) return;
+    if (
+      virtualPointersRef.current[side]?.pointerId !== event.pointerId
+    ) {
+      return;
+    }
     updateVirtualStick(side, event);
   };
 
@@ -2161,7 +2274,11 @@ export default function FlightSimulator({
     event: ReactPointerEvent<HTMLButtonElement>,
   ) => {
     const side = getVirtualStickSide(event);
-    if (virtualPointersRef.current[side] !== event.pointerId) return;
+    if (
+      virtualPointersRef.current[side]?.pointerId !== event.pointerId
+    ) {
+      return;
+    }
     event.preventDefault();
     virtualPointersRef.current[side] = null;
     if (side === "left") {
@@ -2193,7 +2310,7 @@ export default function FlightSimulator({
           ref={canvasRef}
           className="flight-canvas"
           role="img"
-          aria-label={`조종자 시점 비행장과 전체 지도. 기체 위치 x ${snapshot.x.toFixed(1)}m, z ${snapshot.z.toFixed(1)}m, 고도 ${snapshot.altitude.toFixed(1)}m. 현재 목표: ${activeWaypoint?.label ?? "훈련 완료"}`}
+          aria-label={`조종자 시점 비행장과 기체 중심 주변 지도. 기체 위치 x ${snapshot.x.toFixed(1)}m, z ${snapshot.z.toFixed(1)}m, 고도 ${snapshot.altitude.toFixed(1)}m. 현재 목표: ${activeWaypoint?.label ?? "훈련 완료"}`}
         />
         <div className="flight-stage-glow" aria-hidden="true" />
       </section>
@@ -2226,7 +2343,7 @@ export default function FlightSimulator({
           >
             <i aria-hidden="true" />
             <span>{snapshot.motorsArmed ? "MOTOR ON" : "MOTOR OFF"}</span>
-            <b aria-hidden="true">⏻</b>
+            <b className="power-symbol" aria-hidden="true" />
           </button>
           <button
             type="button"
@@ -2425,7 +2542,7 @@ export default function FlightSimulator({
               onClick={toggleMotors}
               aria-pressed={snapshot.motorsArmed}
             >
-              <span aria-hidden="true">⏻</span>
+              <span className="power-symbol" aria-hidden="true" />
               <b>{snapshot.motorsArmed ? "시동 정지" : "시동"}</b>
             </button>
             <button

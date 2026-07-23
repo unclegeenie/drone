@@ -1381,6 +1381,31 @@ input:focus-visible {
   color: #8ee7ac;
 }
 
+.power-symbol {
+  position: relative;
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  font-size: 0;
+  line-height: 0;
+}
+
+.power-symbol::before {
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  width: 2px;
+  height: 8px;
+  border-radius: 2px;
+  background: currentColor;
+  content: "";
+  transform: translateX(-50%);
+}
+
 .motor-toggle:disabled {
   cursor: default;
   opacity: 0.58;
@@ -2140,7 +2165,7 @@ input:focus-visible {
   left: 50%;
   top: 50%;
   display: grid;
-  width: 42%;
+  width: 30%;
   aspect-ratio: 1;
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.48);
@@ -2195,6 +2220,11 @@ input:focus-visible {
   color: var(--yellow);
   font-size: 16px;
   line-height: 1;
+}
+
+.touch-action-button .power-symbol {
+  width: 15px;
+  height: 15px;
 }
 
 .touch-action-button b {

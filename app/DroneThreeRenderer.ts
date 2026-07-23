@@ -81,12 +81,10 @@ export class DroneThreeRenderer {
 
   constructor() {
     this.canvas = document.createElement("canvas");
-    const coarsePointer =
-      window.matchMedia?.("(pointer: coarse)").matches ?? false;
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
       alpha: true,
-      antialias: !coarsePointer,
+      antialias: true,
       powerPreference: "high-performance",
       premultipliedAlpha: true,
       precision: "mediump",
@@ -319,9 +317,12 @@ export class DroneThreeRenderer {
     cropHeight: number,
   ) {
     const mobile = fullWidth <= 760;
+    // 메인 2D 캔버스에 확대 합성해도 기체가 흐려지지 않도록 모바일은
+    // 1.5배까지 렌더합니다. 작은 crop만 그리므로 전체 화면 WebGL보다
+    // 버퍼가 훨씬 작고, 고밀도 기기에서도 상한을 둬 GPU 부하를 제한합니다.
     const pixelRatio = Math.min(
       window.devicePixelRatio || 1,
-      mobile ? 1 : 1.35,
+      mobile ? 1.5 : 1.35,
     );
     if (
       cropWidth !== this.lastBufferWidth ||
@@ -404,7 +405,16 @@ export class DroneThreeRenderer {
     // 동시에 방지합니다.
     const requiredCrop =
       visualProjectedSpan * farBoost * 1.25 + 48;
-    const cropTarget = mobile ? 256 : requiredCrop > 384 ? 512 : 384;
+    // 모바일은 평소 256px crop을 유지하고, 가까운 기체가 로터까지
+    // 256px을 넘길 때만 384px로 확장합니다. 1.5 DPR 기준 최대
+    // 576×576 버퍼여서 선명도를 높이면서도 메모리·합성 비용을 제한합니다.
+    const cropTarget = mobile
+      ? requiredCrop > 256
+        ? 384
+        : 256
+      : requiredCrop > 384
+        ? 512
+        : 384;
     const cropWidth = Math.min(width, cropTarget);
     const cropHeight = Math.min(height, cropTarget);
     const cropX = Math.round(
