@@ -100,11 +100,22 @@ export function distanceFromPilot(x: number, z: number) {
 }
 
 export function getPilotFocal(width: number, height: number) {
-  // 세로형 모바일은 가로 폭이 좁아 같은 계수에서 표식이 소실점에 지나치게
-  // 압축됩니다. 세로형 모바일만 현재 시야보다 약 10% 당기되 좌우
-  // B·D점이 과도하게 잘리지 않는 범위로 제한합니다.
-  const widthRatio = width <= 520 && height > width ? 0.68 : 0.54;
-  return Math.min(width * widthRatio, height * 0.96);
+  const portraitMobile = width <= 520 && height > width;
+  const shortLandscape = height <= 520 && width > height;
+
+  // 세로 모바일은 기존 0.68보다 약 16% 당겨 드론과 라바콘을 키웁니다.
+  // B·D 표식은 화면 안에 유지하면서도 소실점에 뭉쳐 보이지 않는 범위입니다.
+  if (portraitMobile) {
+    return Math.min(width * 0.79, height * 1.04);
+  }
+
+  // 모바일 가로 화면은 세로 높이 상한에도 함께 걸리므로 폭 계수만 올리면
+  // 확대가 보이지 않습니다. 높이 상한을 별도로 완화해 약 15~20% 당깁니다.
+  if (shortLandscape) {
+    return Math.min(width * 0.62, height * 1.15);
+  }
+
+  return Math.min(width * 0.54, height * 0.96);
 }
 
 function toViewSpace(x: number, z: number) {
@@ -1288,7 +1299,10 @@ function drawDrone(
     height,
   );
   const ground = projectWorld(state.x, 0, state.z, width, height);
-  const marginX = 70;
+  // 세로 모바일은 확대된 실제 기체 폭을 고려하면 F 착륙장의 기체도
+  // 화면 안에 충분히 들어옵니다. 고정 70px 판정으로 조기에 위치 화살표로
+  // 바뀌지 않도록 안전 여백만 남깁니다.
+  const marginX = width <= 520 && height > width ? 38 : 70;
   const marginTop = 78;
   const marginBottom = 58;
   const onScreen =

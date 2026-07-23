@@ -70,23 +70,29 @@ export function drawFieldMiniMap(
   mission: MapWaypoint[],
   guideMode: MapGuideMode = "full",
 ) {
-  const shortLandscape = viewportHeight <= 520 && viewportWidth > 520;
+  const shortLandscape =
+    viewportHeight <= 520 && viewportWidth > viewportHeight;
   const portraitMobile =
     viewportWidth <= 520 && viewportHeight > viewportWidth;
   const compactMobile = viewportWidth <= 520 || shortLandscape;
   const expandedMobileHud =
-    portraitMobile && viewportWidth >= 341 && viewportHeight >= 691;
+    portraitMobile && viewportWidth >= 341 && viewportHeight >= 560;
   const mobileMapScale = expandedMobileHud ? 1.1 : 1;
+  const shortLandscapeMapWidth = clamp(
+    Math.min(viewportWidth * 0.19, viewportHeight * 0.38),
+    100,
+    150,
+  );
   const panelWidth = compactMobile
     ? shortLandscape
-      ? clamp(viewportWidth * 0.19, 136, 150)
+      ? shortLandscapeMapWidth
       : expandedMobileHud
         ? clamp(viewportWidth * 0.46, 160, 174)
         : clamp(viewportWidth * 0.42, 146, 158)
     : clamp(viewportWidth * 0.2, 176, 260);
   const panelHeight = compactMobile
     ? shortLandscape
-      ? clamp(panelWidth * 1.06, 144, 158)
+      ? clamp(panelWidth * 1.06, 106, 158)
       : expandedMobileHud
         ? clamp(panelWidth * 1.18, 189, 209)
         : clamp(panelWidth * 1.18, 172, 190)
@@ -95,18 +101,41 @@ export function drawFieldMiniMap(
     viewportWidth - panelWidth - (viewportWidth <= 760 ? 10 : 24);
   const panelY =
     shortLandscape
-      ? 94
+      ? viewportHeight < 330
+        ? 50
+        : 56
       : compactMobile
-      ? expandedMobileHud
-        ? 204
-        : 178
+      ? portraitMobile && !expandedMobileHud
+        ? 178
+        : 68
       : viewportWidth <= 760
         ? 148
         : 164;
-  const headerHeight = expandedMobileHud ? 26 : compactMobile ? 24 : 27;
-  const footerHeight = expandedMobileHud ? 30 : compactMobile ? 27 : 32;
-  const panelInset = expandedMobileHud ? 10 : 9;
-  const mapBottomGap = expandedMobileHud ? 8 : 7;
+  const veryShortLandscape = shortLandscape && panelWidth < 120;
+  const headerHeight = expandedMobileHud
+    ? 26
+    : veryShortLandscape
+      ? 20
+      : compactMobile
+        ? 24
+        : 27;
+  const footerHeight = expandedMobileHud
+    ? 30
+    : veryShortLandscape
+      ? 22
+      : compactMobile
+        ? 27
+        : 32;
+  const panelInset = expandedMobileHud
+    ? 10
+    : veryShortLandscape
+      ? 7
+      : 9;
+  const mapBottomGap = expandedMobileHud
+    ? 8
+    : veryShortLandscape
+      ? 5
+      : 7;
   const mapX = panelX + panelInset;
   const mapY = panelY + headerHeight;
   const mapWidth = panelWidth - panelInset * 2;
@@ -164,7 +193,7 @@ export function drawFieldMiniMap(
   context.textAlign = "left";
   context.textBaseline = "middle";
   context.fillText(
-    "주변 지도 ±10m",
+    veryShortLandscape ? "주변 ±10m" : "주변 지도 ±10m",
     panelX + 11 * mobileMapScale,
     panelY + headerHeight / 2,
   );
@@ -644,12 +673,18 @@ export function drawFieldMiniMap(
   context.textAlign = "left";
   context.textBaseline = "middle";
   const goalNumber = Math.min(state.waypointIndex + 1, mission.length);
-  const footer =
-    guideMode === "off"
-      ? `고도 ${state.altitude.toFixed(1)}m · 실전`
+  const altitudeText = state.altitude.toFixed(1);
+  const footer = veryShortLandscape
+    ? guideMode === "off"
+      ? `${altitudeText}m · 실전`
       : activeWaypoint
-        ? `고도 ${state.altitude.toFixed(1)}m · 목표 ${goalNumber}/${mission.length}`
-        : `고도 ${state.altitude.toFixed(1)}m · 완료`;
+        ? `${altitudeText}m · ${goalNumber}/${mission.length}`
+        : `${altitudeText}m · 완료`
+    : guideMode === "off"
+      ? `고도 ${altitudeText}m · 실전`
+      : activeWaypoint
+        ? `고도 ${altitudeText}m · 목표 ${goalNumber}/${mission.length}`
+        : `고도 ${altitudeText}m · 완료`;
   context.fillText(
     footer,
     panelX + 10 * mobileMapScale,

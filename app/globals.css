@@ -3162,3 +3162,280 @@ input:focus-visible {
     font-size: 12px;
   }
 }
+
+/* 모바일 비행 화면: 조종기 설명을 덜어내고 스틱과 비행 시야에 공간을 배분합니다. */
+.flight-shell.device-mobile .touch-cluster-label {
+  display: none;
+}
+
+/* 일반 스마트폰 세로 화면은 단계와 계기를 왼쪽에 쌓아
+   오른쪽의 주변 지도 및 중앙 비행 시야를 가리지 않게 합니다. */
+@media (min-width: 341px) and (max-width: 520px) and (min-height: 560px) and (orientation: portrait) {
+  .flight-shell.device-mobile .flight-topbar {
+    min-height: 60px;
+    padding: 8px 10px;
+  }
+
+  .flight-shell.device-mobile .flight-hud {
+    top: 68px;
+    display: grid;
+    grid-template-columns:
+      minmax(0, 1fr)
+      clamp(160px, 46vw, 174px);
+    grid-template-rows: auto auto;
+    column-gap: 8px;
+    row-gap: 5px;
+  }
+
+  .flight-shell.device-mobile .objective-card {
+    grid-column: 1;
+    grid-row: 1;
+    width: auto;
+    min-width: 0;
+    border-radius: 12px;
+    padding: 8px 10px 7px;
+  }
+
+  .flight-shell.device-mobile .objective-heading {
+    gap: 4px;
+    margin-bottom: 2px;
+    font-size: 8px;
+    letter-spacing: 0.06em;
+  }
+
+  .flight-shell.device-mobile .objective-heading b {
+    font-size: 8px;
+  }
+
+  .flight-shell.device-mobile .objective-card h1 {
+    overflow: hidden;
+    font-size: 17px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .flight-shell.device-mobile .objective-card > p {
+    min-height: 0;
+    overflow: hidden;
+    margin: 2px 0 5px;
+    font-size: 9px;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .flight-shell.device-mobile .objective-card .target-hold {
+    margin-top: 4px;
+  }
+
+  .flight-shell.device-mobile .telemetry-card {
+    grid-column: 1;
+    grid-row: 2;
+    width: auto;
+    min-width: 0;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-radius: 12px;
+  }
+
+  .flight-shell.device-mobile .telemetry-card > div {
+    min-width: 0;
+    min-height: 48px;
+    padding: 4px 2px;
+  }
+
+  .flight-shell.device-mobile .telemetry-card > div:nth-child(3) {
+    display: grid;
+  }
+
+  .flight-shell.device-mobile .telemetry-card > div:nth-child(n + 4) {
+    display: none;
+  }
+
+  .flight-shell.device-mobile .telemetry-card span,
+  .flight-shell.device-mobile .telemetry-card small {
+    font-size: 8px;
+  }
+
+  .flight-shell.device-mobile .telemetry-card strong {
+    font-size: 16px;
+  }
+
+  .flight-shell.device-mobile .wind-indicator {
+    left: 9px;
+    top: 212px;
+    max-width: min(190px, calc(52vw - 20px));
+    font-size: 10px;
+    padding: 7px 9px;
+  }
+
+  .flight-shell.device-mobile .wind-indicator span {
+    font-size: 14px;
+  }
+
+  .flight-shell.device-mobile .flight-warning {
+    bottom: calc(196px + env(safe-area-inset-bottom));
+  }
+
+  .flight-shell.device-mobile .touch-controls {
+    grid-template-columns:
+      minmax(0, 184px)
+      58px
+      minmax(0, 184px);
+    gap: 4px;
+  }
+
+  .flight-shell.device-mobile .touch-cluster {
+    width: 100%;
+    max-width: 184px;
+    gap: 0;
+  }
+
+  .flight-shell.device-mobile .touch-actions {
+    width: 58px;
+    gap: 7px;
+    padding-bottom: 8px;
+  }
+
+  .flight-shell.device-mobile .touch-action-button {
+    width: 58px;
+    min-width: 58px;
+    min-height: 48px;
+    padding: 4px 2px;
+  }
+}
+
+/* 낮은 가로 화면에서도 계기를 단계 카드 바로 아래에 두고
+   오른쪽 지도와 양쪽 스틱이 서로 겹치지 않게 합니다. */
+@media (max-height: 520px) and (orientation: landscape) {
+  .flight-shell.device-mobile .flight-hud {
+    display: grid;
+    grid-template-columns:
+      clamp(184px, 28vw, 216px)
+      minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    column-gap: 8px;
+    row-gap: 4px;
+  }
+
+  .flight-shell.device-mobile .objective-card {
+    grid-column: 1;
+    grid-row: 1;
+    width: auto;
+    min-width: 0;
+    border-radius: 11px;
+    padding: 6px 8px;
+  }
+
+  .flight-shell.device-mobile .telemetry-card {
+    grid-column: 1;
+    grid-row: 2;
+    width: auto;
+    min-width: 0;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-radius: 11px;
+  }
+
+  .flight-shell.device-mobile .telemetry-card > div {
+    min-width: 0;
+    min-height: 40px;
+    padding: 3px 2px;
+  }
+
+  .flight-shell.device-mobile .telemetry-card > div:nth-child(3) {
+    display: grid;
+  }
+
+  .flight-shell.device-mobile .telemetry-card > div:nth-child(n + 4) {
+    display: none;
+  }
+
+  .flight-shell.device-mobile .telemetry-card span,
+  .flight-shell.device-mobile .telemetry-card small {
+    font-size: 7px;
+  }
+
+  .flight-shell.device-mobile .telemetry-card strong {
+    font-size: 13px;
+  }
+
+  .flight-shell.device-mobile .wind-indicator {
+    left: calc(
+      max(8px, env(safe-area-inset-left)) +
+      clamp(184px, 28vw, 216px) +
+      8px
+    );
+    top: 50px;
+    max-width: 180px;
+    font-size: 9px;
+    padding: 6px 8px;
+    transform: none;
+  }
+
+  .flight-shell.device-mobile .wind-indicator span {
+    font-size: 13px;
+  }
+
+  .flight-shell.device-mobile .touch-controls {
+    grid-template-columns:
+      minmax(104px, 140px)
+      58px
+      minmax(104px, 140px);
+    gap: 5px;
+  }
+
+  .flight-shell.device-mobile .touch-cluster {
+    width: clamp(104px, 40dvh, 140px);
+    gap: 0;
+  }
+
+  .flight-shell.device-mobile .touch-actions {
+    width: 58px;
+    gap: 5px;
+    padding-bottom: 4px;
+  }
+
+  .flight-shell.device-mobile .touch-action-button {
+    width: 58px;
+    min-width: 58px;
+    min-height: 40px;
+    padding: 3px 2px;
+  }
+}
+
+/* 브라우저 막대로 실제 높이가 극단적으로 줄어든 가로 화면은
+   지도·경고·스틱이 맞닿지 않도록 필수 정보와 조작부만 남깁니다. */
+@media (max-height: 290px) and (orientation: landscape) {
+  .flight-shell.device-mobile .target-hold {
+    display: none;
+  }
+
+  .flight-shell.device-mobile .flight-warning {
+    top: 90px;
+    bottom: auto;
+    max-width: 190px;
+  }
+
+  .flight-shell.device-mobile .touch-controls {
+    grid-template-columns:
+      minmax(96px, 104px)
+      54px
+      minmax(96px, 104px);
+    gap: 4px;
+  }
+
+  .flight-shell.device-mobile .touch-cluster {
+    width: clamp(96px, 36dvh, 104px);
+  }
+
+  .flight-shell.device-mobile .touch-actions {
+    width: 54px;
+    gap: 4px;
+    padding-bottom: 2px;
+  }
+
+  .flight-shell.device-mobile .touch-action-button {
+    width: 54px;
+    min-width: 54px;
+    min-height: 38px;
+  }
+}

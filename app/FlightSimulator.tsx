@@ -2628,10 +2628,6 @@ export default function FlightSimulator({
           aria-label="MODE 2 화면 가상 조종기"
         >
           <div className="touch-cluster">
-            <span className="touch-cluster-label">
-              <b>왼쪽 스틱</b>
-              상승·하강 / 러더
-            </span>
             <button
               ref={(element) => {
                 virtualStickElementsRef.current.left = element;
@@ -2680,10 +2676,6 @@ export default function FlightSimulator({
           </div>
 
           <div className="touch-cluster">
-            <span className="touch-cluster-label">
-              <b>오른쪽 스틱</b>
-              전후 / 좌우 이동
-            </span>
             <button
               ref={(element) => {
                 virtualStickElementsRef.current.right = element;
