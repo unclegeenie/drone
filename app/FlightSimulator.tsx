@@ -29,6 +29,7 @@ import {
 
 type Grade = "1" | "2";
 type TrainingMode = "course" | "exam";
+type DeviceMode = "pc" | "mobile";
 type FlightPhase =
   | "briefing"
   | "running"
@@ -102,9 +103,19 @@ type FlightSimulatorProps = {
   courseLabel: string;
   weight: number;
   weightBasisLabel: string;
+  deviceMode: DeviceMode;
   controllerName?: string;
   onExit: () => void;
 };
+
+type VirtualAxes = {
+  yaw: number;
+  throttle: number;
+  roll: number;
+  pitch: number;
+};
+
+type VirtualStickSide = "left" | "right";
 
 const FIELD = FIELD_BOUNDS;
 
@@ -1188,6 +1199,7 @@ export default function FlightSimulator({
   courseLabel,
   weight,
   weightBasisLabel,
+  deviceMode,
   controllerName,
   onExit,
 }: FlightSimulatorProps) {
@@ -1220,11 +1232,29 @@ export default function FlightSimulator({
   const pressedKeysRef = useRef(new Set<string>());
   const keyHoldStartedAtRef = useRef(new Map<string, number>());
   const previousButtonsRef = useRef([false, false, false]);
+  const virtualAxesRef = useRef<VirtualAxes>({
+    yaw: 0,
+    throttle: 0,
+    roll: 0,
+    pitch: 0,
+  });
+  const virtualPointersRef = useRef<Record<VirtualStickSide, number | null>>({
+    left: null,
+    right: null,
+  });
+  const virtualStickElementsRef = useRef<
+    Record<VirtualStickSide, HTMLButtonElement | null>
+  >({
+    left: null,
+    right: null,
+  });
 
   useEffect(() => {
     guideModeRef.current = guideMode;
   }, [guideMode]);
-  const controllerWasActiveRef = useRef(Boolean(controllerName));
+  const controllerWasActiveRef = useRef(
+    deviceMode === "pc" && Boolean(controllerName),
+  );
   const lastHudUpdateRef = useRef(0);
   const lastAnnouncedWaypointRef = useRef(-1);
 
@@ -1233,9 +1263,53 @@ export default function FlightSimulator({
     setSnapshot({ ...next });
   }, []);
 
+  const clearVirtualControls = useCallback(() => {
+    virtualAxesRef.current = {
+      yaw: 0,
+      throttle: 0,
+      roll: 0,
+      pitch: 0,
+    };
+    virtualPointersRef.current = { left: null, right: null };
+    (["left", "right"] as const).forEach((side) => {
+      const element = virtualStickElementsRef.current[side];
+      element?.style.setProperty("--stick-x", "0px");
+      element?.style.setProperty("--stick-y", "0px");
+    });
+  }, []);
+
+  useEffect(() => {
+    if (deviceMode !== "mobile") clearVirtualControls();
+  }, [clearVirtualControls, deviceMode]);
+
+  const beginFlight = useCallback(() => {
+    const current = flightRef.current;
+    if (current.phase !== "briefing") return;
+
+    pressedKeysRef.current.clear();
+    keyHoldStartedAtRef.current.clear();
+    clearVirtualControls();
+    commitState({
+      ...current,
+      phase: "running",
+      motorsArmed: false,
+      autoVertical: null,
+      warning:
+        deviceMode === "mobile"
+          ? "시동 대기 · 화면 하단 시동 버튼을 눌러주세요."
+          : "시동 대기 · M키 또는 상단 전원 버튼을 눌러주세요.",
+    });
+    setHelpOpen(true);
+    setAnnouncement(
+      deviceMode === "mobile"
+        ? "비행장에 입장했습니다. 화면 하단 시동 버튼으로 수동 시동을 걸어주세요."
+        : "비행장에 입장했습니다. M키 또는 상단 전원 버튼으로 수동 시동을 걸어주세요.",
+    );
+  }, [clearVirtualControls, commitState, deviceMode]);
+
   const toggleMotors = useCallback(() => {
     const current = flightRef.current;
-    if (current.phase !== "briefing" && current.phase !== "running") return;
+    if (current.phase !== "running") return;
 
     if (
       current.motorsArmed &&
@@ -1252,7 +1326,6 @@ export default function FlightSimulator({
     const motorsArmed = !current.motorsArmed;
     const next = {
       ...current,
-      phase: "running" as const,
       motorsArmed,
       autoVertical: null,
       vx: motorsArmed ? current.vx : 0,
@@ -1267,6 +1340,7 @@ export default function FlightSimulator({
     };
     pressedKeysRef.current.clear();
     keyHoldStartedAtRef.current.clear();
+    clearVirtualControls();
     commitState(next);
     setHelpOpen(motorsArmed);
     setAnnouncement(
@@ -1274,7 +1348,7 @@ export default function FlightSimulator({
         ? "기체 시동이 완료되었습니다. 프로펠러가 회전합니다."
         : "기체 시동을 껐습니다.",
     );
-  }, [commitState]);
+  }, [clearVirtualControls, commitState]);
 
   const toggleAutoVertical = useCallback(() => {
     const current = flightRef.current;
@@ -1311,6 +1385,7 @@ export default function FlightSimulator({
     if (current.phase === "running") {
       pressedKeysRef.current.clear();
       keyHoldStartedAtRef.current.clear();
+      clearVirtualControls();
       commitState({
         ...current,
         phase: "paused",
@@ -1323,14 +1398,16 @@ export default function FlightSimulator({
     if (current.phase === "paused") {
       pressedKeysRef.current.clear();
       keyHoldStartedAtRef.current.clear();
+      clearVirtualControls();
       commitState({ ...current, phase: "running", warning: null });
       setAnnouncement("비행을 계속합니다.");
     }
-  }, [commitState]);
+  }, [clearVirtualControls, commitState]);
 
   const resetFlight = useCallback(() => {
     pressedKeysRef.current.clear();
     keyHoldStartedAtRef.current.clear();
+    clearVirtualControls();
     previousButtonsRef.current = [false, false, false];
     const next = createInitialState(
       flightRef.current.controllerName ?? controllerName,
@@ -1340,7 +1417,7 @@ export default function FlightSimulator({
     lastAnnouncedWaypointRef.current = -1;
     setHelpOpen(true);
     setAnnouncement("훈련을 초기화했습니다. 기체 시동부터 다시 시작합니다.");
-  }, [commitState, controllerName]);
+  }, [clearVirtualControls, commitState, controllerName]);
 
   const cycleGuideMode = useCallback(() => {
     const nextMode = NEXT_GUIDE_MODE[guideMode];
@@ -1390,6 +1467,7 @@ export default function FlightSimulator({
     const pauseForFocusLoss = () => {
       pressedKeysRef.current.clear();
       keyHoldStartedAtRef.current.clear();
+      clearVirtualControls();
       const current = flightRef.current;
       if (current.phase === "running") {
         commitState({
@@ -1417,6 +1495,7 @@ export default function FlightSimulator({
     };
   }, [
     commitState,
+    clearVirtualControls,
     resetFlight,
     toggleAutoVertical,
     toggleMotors,
@@ -1485,9 +1564,12 @@ export default function FlightSimulator({
       const state = { ...flightRef.current };
 
       const gamepads = navigator.getGamepads?.() ?? [];
-      const gamepad = Array.from(gamepads).find(
-        (item): item is Gamepad => Boolean(item),
-      );
+      const gamepad =
+        deviceMode === "pc"
+          ? Array.from(gamepads).find(
+              (item): item is Gamepad => Boolean(item),
+            )
+          : undefined;
 
       if (gamepad) {
         controllerWasActiveRef.current = true;
@@ -1497,6 +1579,7 @@ export default function FlightSimulator({
         state.inputLabel = "키보드";
         state.controllerName = undefined;
         if (
+          deviceMode === "pc" &&
           controllerWasActiveRef.current &&
           flightRef.current.phase === "running"
         ) {
@@ -1510,12 +1593,12 @@ export default function FlightSimulator({
         controllerWasActiveRef.current = false;
       }
 
-      const buttonTakeoff = Boolean(gamepad?.buttons[0]?.pressed);
-      const buttonLanding = Boolean(gamepad?.buttons[1]?.pressed);
+      const buttonMotor = Boolean(gamepad?.buttons[0]?.pressed);
+      const buttonAutoVertical = Boolean(gamepad?.buttons[1]?.pressed);
       const buttonPause = Boolean(gamepad?.buttons[9]?.pressed);
       const previousButtons = previousButtonsRef.current;
 
-      if (buttonTakeoff && !previousButtons[0]) {
+      if (buttonMotor && !previousButtons[0]) {
         if (state.phase === "briefing") {
           state.phase = "running";
           state.motorsArmed = true;
@@ -1525,21 +1608,35 @@ export default function FlightSimulator({
           if (!state.motorsArmed) {
             state.motorsArmed = true;
             state.warning = null;
+          } else if (
+            state.altitude <= 0.1 &&
+            Math.hypot(state.vx, state.vz) <= 0.25
+          ) {
+            state.motorsArmed = false;
+            state.autoVertical = null;
+            state.vx = 0;
+            state.vz = 0;
+            state.vy = 0;
+            state.pitch = 0;
+            state.roll = 0;
+            state.yawRate = 0;
+            state.warning = "시동이 꺼졌습니다.";
           } else {
-            state.autoVertical =
-              state.altitude < 0.35 ? "takeoff" : "landing";
+            state.warning = "비행 중에는 시동을 끌 수 없습니다.";
           }
         }
       }
       if (
-        buttonLanding &&
+        buttonAutoVertical &&
         !previousButtons[1] &&
         state.phase === "running" &&
         state.motorsArmed
       ) {
-        state.autoVertical = "landing";
+        state.autoVertical =
+          state.altitude < 0.35 ? "takeoff" : "landing";
       }
       if (buttonPause && !previousButtons[2]) {
+        clearVirtualControls();
         if (state.phase === "running") {
           state.phase = "paused";
           state.yawRate = 0;
@@ -1550,110 +1647,140 @@ export default function FlightSimulator({
         }
       }
       previousButtonsRef.current = [
-        buttonTakeoff,
-        buttonLanding,
+        buttonMotor,
+        buttonAutoVertical,
         buttonPause,
       ];
 
       if (state.phase === "running") {
         const keys = pressedKeysRef.current;
         const keyStarts = keyHoldStartedAtRef.current;
+        const keyboardEnabled = deviceMode === "pc";
         const keyboardPitch =
-          keyboardHoldStrength(
-            keys,
-            keyStarts,
-            "ArrowUp",
-            time,
-            KEYBOARD_RAMP.horizontal,
-          ) -
-          keyboardHoldStrength(
-            keys,
-            keyStarts,
-            "ArrowDown",
-            time,
-            KEYBOARD_RAMP.horizontal,
-          );
+          keyboardEnabled
+            ? keyboardHoldStrength(
+                keys,
+                keyStarts,
+                "ArrowUp",
+                time,
+                KEYBOARD_RAMP.horizontal,
+              ) -
+              keyboardHoldStrength(
+                keys,
+                keyStarts,
+                "ArrowDown",
+                time,
+                KEYBOARD_RAMP.horizontal,
+              )
+            : 0;
         const keyboardRoll =
-          keyboardHoldStrength(
-            keys,
-            keyStarts,
-            "ArrowRight",
-            time,
-            KEYBOARD_RAMP.horizontal,
-          ) -
-          keyboardHoldStrength(
-            keys,
-            keyStarts,
-            "ArrowLeft",
-            time,
-            KEYBOARD_RAMP.horizontal,
-          );
+          keyboardEnabled
+            ? keyboardHoldStrength(
+                keys,
+                keyStarts,
+                "ArrowRight",
+                time,
+                KEYBOARD_RAMP.horizontal,
+              ) -
+              keyboardHoldStrength(
+                keys,
+                keyStarts,
+                "ArrowLeft",
+                time,
+                KEYBOARD_RAMP.horizontal,
+              )
+            : 0;
         const keyboardYaw =
-          keyboardHoldStrength(
-            keys,
-            keyStarts,
-            "KeyD",
-            time,
-            KEYBOARD_RAMP.yaw,
-          ) -
-          keyboardHoldStrength(
-            keys,
-            keyStarts,
-            "KeyA",
-            time,
-            KEYBOARD_RAMP.yaw,
-          );
+          keyboardEnabled
+            ? keyboardHoldStrength(
+                keys,
+                keyStarts,
+                "KeyD",
+                time,
+                KEYBOARD_RAMP.yaw,
+              ) -
+              keyboardHoldStrength(
+                keys,
+                keyStarts,
+                "KeyA",
+                time,
+                KEYBOARD_RAMP.yaw,
+              )
+            : 0;
         const keyboardThrottle =
-          keyboardHoldStrength(
-            keys,
-            keyStarts,
-            "KeyW",
-            time,
-            KEYBOARD_RAMP.vertical,
-          ) -
-          keyboardHoldStrength(
-            keys,
-            keyStarts,
-            "KeyS",
-            time,
-            KEYBOARD_RAMP.vertical,
-          );
+          keyboardEnabled
+            ? keyboardHoldStrength(
+                keys,
+                keyStarts,
+                "KeyW",
+                time,
+                KEYBOARD_RAMP.vertical,
+              ) -
+              keyboardHoldStrength(
+                keys,
+                keyStarts,
+                "KeyS",
+                time,
+                KEYBOARD_RAMP.vertical,
+              )
+            : 0;
         const keyboardPeak = Math.max(
           Math.abs(keyboardPitch),
           Math.abs(keyboardRoll),
           Math.abs(keyboardYaw),
           Math.abs(keyboardThrottle),
         );
+        const virtualAxes =
+          deviceMode === "mobile"
+            ? virtualAxesRef.current
+            : { yaw: 0, throttle: 0, roll: 0, pitch: 0 };
+        const virtualPeak = Math.max(
+          Math.abs(virtualAxes.pitch),
+          Math.abs(virtualAxes.roll),
+          Math.abs(virtualAxes.yaw),
+          Math.abs(virtualAxes.throttle),
+        );
 
         if (!gamepad) {
+          const inputPeak = Math.max(keyboardPeak, virtualPeak);
+          const inputName =
+            deviceMode === "mobile" ? "화면 조종기" : "키보드";
           state.inputLabel =
-            keyboardPeak === 0
-              ? "키보드 · 누름 가속"
-              : keyboardPeak < 0.42
-                ? "키보드 · 미세"
-                : keyboardPeak < 0.8
-                  ? "키보드 · 중속"
-                  : "키보드 · 가속";
+            inputPeak === 0
+              ? `${inputName} · 대기`
+              : inputPeak < 0.42
+                ? `${inputName} · 미세`
+                : inputPeak < 0.8
+                  ? `${inputName} · 중속`
+                  : `${inputName} · 가속`;
         }
 
         const axes = gamepad?.axes ?? [];
         const pitch = clamp(
-          keyboardPitch - deadzone(axes[3] ?? 0),
+          keyboardPitch -
+            deadzone(axes[3] ?? 0) -
+            deadzone(virtualAxes.pitch),
           -1,
           1,
         );
         const roll = clamp(
-          keyboardRoll + deadzone(axes[2] ?? 0),
+          keyboardRoll +
+            deadzone(axes[2] ?? 0) +
+            deadzone(virtualAxes.roll),
           -1,
           1,
         );
         const yawInput = clamp(
-          keyboardYaw + deadzone(axes[0] ?? 0),
+          keyboardYaw +
+            deadzone(axes[0] ?? 0) +
+            deadzone(virtualAxes.yaw),
           -1,
           1,
         );
         const throttle = clamp(
-          keyboardThrottle - deadzone(axes[1] ?? 0),
+          keyboardThrottle -
+            deadzone(axes[1] ?? 0) -
+            deadzone(virtualAxes.throttle),
           -1,
           1,
         );
@@ -1944,7 +2071,14 @@ export default function FlightSimulator({
       cancelAnimationFrame(animationFrame);
       observer.disconnect();
     };
-  }, [courseId, mission, trainingMode, weight]);
+  }, [
+    clearVirtualControls,
+    courseId,
+    deviceMode,
+    mission,
+    trainingMode,
+    weight,
+  ]);
 
   const activeWaypoint =
     mission[Math.min(snapshot.waypointIndex, mission.length - 1)];
@@ -1964,33 +2098,85 @@ export default function FlightSimulator({
   const missionTitle =
     trainingMode === "exam" ? `${grade}종 전체 시험` : courseLabel;
 
-  const pressTouch = (code: string) => (
+  const updateVirtualStick = (
+    side: VirtualStickSide,
     event: ReactPointerEvent<HTMLButtonElement>,
   ) => {
     event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    pressedKeysRef.current.add(code);
-    if (
-      RAMPED_INPUT_CODES.has(code) &&
-      !keyHoldStartedAtRef.current.has(code)
-    ) {
-      keyHoldStartedAtRef.current.set(code, performance.now());
+    const rect = event.currentTarget.getBoundingClientRect();
+    const inputRadius = Math.max(1, Math.min(rect.width, rect.height) * 0.29);
+    let x = (event.clientX - (rect.left + rect.width / 2)) / inputRadius;
+    let y = (event.clientY - (rect.top + rect.height / 2)) / inputRadius;
+    const magnitude = Math.hypot(x, y);
+    if (magnitude > 1) {
+      x /= magnitude;
+      y /= magnitude;
     }
-  };
-  const releaseTouch = (code: string) => (
-    event: ReactPointerEvent<HTMLButtonElement>,
-  ) => {
-    event.preventDefault();
-    pressedKeysRef.current.delete(code);
-    keyHoldStartedAtRef.current.delete(code);
+
+    const curve = (value: number) =>
+      Math.sign(value) * Math.pow(Math.abs(value), 1.25);
+    if (side === "left") {
+      virtualAxesRef.current.yaw = curve(x);
+      virtualAxesRef.current.throttle = curve(y);
+    } else {
+      virtualAxesRef.current.roll = curve(x);
+      virtualAxesRef.current.pitch = curve(y);
+    }
+
+    event.currentTarget.style.setProperty(
+      "--stick-x",
+      `${x * inputRadius}px`,
+    );
+    event.currentTarget.style.setProperty(
+      "--stick-y",
+      `${y * inputRadius}px`,
+    );
   };
 
-  const touchButtonProps = (code: string, label: string) => ({
-    "aria-label": label,
-    onPointerDown: pressTouch(code),
-    onPointerUp: releaseTouch(code),
-    onPointerCancel: releaseTouch(code),
-  });
+  const getVirtualStickSide = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ): VirtualStickSide =>
+    event.currentTarget.dataset.stickSide === "right" ? "right" : "left";
+
+  const startVirtualStick = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) => {
+    const side = getVirtualStickSide(event);
+    event.preventDefault();
+    if (virtualPointersRef.current[side] !== null) return;
+    virtualPointersRef.current[side] = event.pointerId;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    updateVirtualStick(side, event);
+  };
+
+  const moveVirtualStick = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) => {
+    const side = getVirtualStickSide(event);
+    if (virtualPointersRef.current[side] !== event.pointerId) return;
+    updateVirtualStick(side, event);
+  };
+
+  const releaseVirtualStick = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) => {
+    const side = getVirtualStickSide(event);
+    if (virtualPointersRef.current[side] !== event.pointerId) return;
+    event.preventDefault();
+    virtualPointersRef.current[side] = null;
+    if (side === "left") {
+      virtualAxesRef.current.yaw = 0;
+      virtualAxesRef.current.throttle = 0;
+    } else {
+      virtualAxesRef.current.roll = 0;
+      virtualAxesRef.current.pitch = 0;
+    }
+    event.currentTarget.style.setProperty("--stick-x", "0px");
+    event.currentTarget.style.setProperty("--stick-y", "0px");
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
 
   const flightStyle = {
     "--mission-progress": `${progress * 100}%`,
@@ -1998,7 +2184,10 @@ export default function FlightSimulator({
   } as CSSProperties;
 
   return (
-    <main className="flight-shell" style={flightStyle}>
+    <main
+      className={`flight-shell device-${deviceMode}`}
+      style={flightStyle}
+    >
       <section className="flight-stage" aria-label={`${missionTitle} 비행 훈련장`}>
         <canvas
           ref={canvasRef}
@@ -2026,13 +2215,19 @@ export default function FlightSimulator({
             <i aria-hidden="true" />
             {snapshot.inputLabel}
           </span>
-          <span
-            className={`input-pill motor-pill ${snapshot.motorsArmed ? "is-armed" : ""}`}
+          <button
+            type="button"
+            className={`input-pill motor-pill motor-toggle ${snapshot.motorsArmed ? "is-armed" : ""}`}
+            onClick={toggleMotors}
             aria-label={`기체 시동 ${snapshot.motorsArmed ? "켜짐" : "꺼짐"}`}
+            aria-keyshortcuts="M"
+            aria-pressed={snapshot.motorsArmed}
+            disabled={snapshot.phase !== "running"}
           >
             <i aria-hidden="true" />
-            {snapshot.motorsArmed ? "MOTOR ON" : "MOTOR OFF"}
-          </span>
+            <span>{snapshot.motorsArmed ? "MOTOR ON" : "MOTOR OFF"}</span>
+            <b aria-hidden="true">⏻</b>
+          </button>
           <button
             type="button"
             className="hud-action guide-mode-toggle"
@@ -2164,48 +2359,118 @@ export default function FlightSimulator({
           </dl>
           <p>방향키 이동은 기체의 기수 방향 기준 · 짧게 누르면 미세조작</p>
           <p>길게 누르면 점진 가속 · P/ESC 일시정지</p>
-          <p>USB 조종기: MODE 2 · A 버튼 시동 후 자동 이륙/착륙</p>
+          <p>USB 조종기: MODE 2 · A 버튼 시동 · B 버튼 자동 이륙/착륙</p>
         </aside>
       )}
 
       {snapshot.phase === "running" && (
         <button
           type="button"
-          className={`auto-flight-button ${snapshot.motorsArmed ? "" : "engine-start-button"}`}
-          onClick={snapshot.motorsArmed ? toggleAutoVertical : toggleMotors}
-          aria-keyshortcuts={snapshot.motorsArmed ? "Space" : "M"}
-          aria-pressed={!snapshot.motorsArmed ? false : undefined}
+          className={`auto-flight-button ${snapshot.motorsArmed ? "" : "is-disabled"}`}
+          onClick={toggleAutoVertical}
+          aria-keyshortcuts="Space"
+          disabled={!snapshot.motorsArmed}
         >
           <span aria-hidden="true">
-            {!snapshot.motorsArmed
-              ? "⏻"
-              : snapshot.altitude < 0.35
+            {snapshot.altitude < 0.35
                 ? "↑"
                 : "↓"}
           </span>
           {!snapshot.motorsArmed
-            ? "시동 걸기"
+            ? "시동 후 사용"
             : snapshot.altitude < 0.35
               ? "자동 이륙"
               : "자동 착륙"}
-          <small>{snapshot.motorsArmed ? "SPACE" : "M"}</small>
+          <small>{snapshot.motorsArmed ? "SPACE" : "M 먼저"}</small>
         </button>
       )}
 
-      <div className="touch-controls" aria-label="터치 비행 조작">
-        <div className="touch-cluster altitude-cluster">
-          <button type="button" {...touchButtonProps("KeyW", "상승")}>W</button>
-          <button type="button" {...touchButtonProps("KeyA", "왼쪽 러더")}>A</button>
-          <button type="button" {...touchButtonProps("KeyD", "오른쪽 러더")}>D</button>
-          <button type="button" {...touchButtonProps("KeyS", "하강")}>S</button>
+      {deviceMode === "mobile" && snapshot.phase === "running" && (
+        <div
+          className="touch-controls"
+          role="group"
+          aria-label="MODE 2 화면 가상 조종기"
+        >
+          <div className="touch-cluster">
+            <span className="touch-cluster-label">
+              <b>왼쪽 스틱</b>
+              상승·하강 / 러더
+            </span>
+            <button
+              ref={(element) => {
+                virtualStickElementsRef.current.left = element;
+              }}
+              type="button"
+              className="virtual-stick"
+              data-stick-side="left"
+              aria-label="왼쪽 스틱: 원 안을 끌어서 위아래 상승·하강, 좌우 러더 조작"
+              onPointerDown={startVirtualStick}
+              onPointerMove={moveVirtualStick}
+              onPointerUp={releaseVirtualStick}
+              onPointerCancel={releaseVirtualStick}
+              onLostPointerCapture={releaseVirtualStick}
+            >
+              <span className="stick-axis stick-axis-horizontal" aria-hidden="true" />
+              <span className="stick-axis stick-axis-vertical" aria-hidden="true" />
+              <span className="stick-thumb" aria-hidden="true">
+                <i />
+              </span>
+            </button>
+          </div>
+
+          <div className="touch-actions" aria-label="기체 동작">
+            <button
+              type="button"
+              className={`touch-action-button ${snapshot.motorsArmed ? "is-armed" : ""}`}
+              onClick={toggleMotors}
+              aria-pressed={snapshot.motorsArmed}
+            >
+              <span aria-hidden="true">⏻</span>
+              <b>{snapshot.motorsArmed ? "시동 정지" : "시동"}</b>
+            </button>
+            <button
+              type="button"
+              className="touch-action-button"
+              onClick={toggleAutoVertical}
+              disabled={!snapshot.motorsArmed}
+            >
+              <span aria-hidden="true">
+                {snapshot.altitude < 0.35 ? "↑" : "↓"}
+              </span>
+              <b>
+                {snapshot.altitude < 0.35 ? "자동 이륙" : "자동 착륙"}
+              </b>
+            </button>
+          </div>
+
+          <div className="touch-cluster">
+            <span className="touch-cluster-label">
+              <b>오른쪽 스틱</b>
+              전후 / 좌우 이동
+            </span>
+            <button
+              ref={(element) => {
+                virtualStickElementsRef.current.right = element;
+              }}
+              type="button"
+              className="virtual-stick"
+              data-stick-side="right"
+              aria-label="오른쪽 스틱: 원 안을 끌어서 위아래 전진·후진, 좌우 이동 조작"
+              onPointerDown={startVirtualStick}
+              onPointerMove={moveVirtualStick}
+              onPointerUp={releaseVirtualStick}
+              onPointerCancel={releaseVirtualStick}
+              onLostPointerCapture={releaseVirtualStick}
+            >
+              <span className="stick-axis stick-axis-horizontal" aria-hidden="true" />
+              <span className="stick-axis stick-axis-vertical" aria-hidden="true" />
+              <span className="stick-thumb" aria-hidden="true">
+                <i />
+              </span>
+            </button>
+          </div>
         </div>
-        <div className="touch-cluster direction-cluster">
-          <button type="button" {...touchButtonProps("ArrowUp", "전진")}>↑</button>
-          <button type="button" {...touchButtonProps("ArrowLeft", "왼쪽 이동")}>←</button>
-          <button type="button" {...touchButtonProps("ArrowRight", "오른쪽 이동")}>→</button>
-          <button type="button" {...touchButtonProps("ArrowDown", "후진")}>↓</button>
-        </div>
-      </div>
+      )}
 
       {snapshot.phase === "briefing" && (
         <div className="flight-overlay" role="dialog" aria-modal="true" aria-labelledby="briefing-title">
@@ -2214,8 +2479,11 @@ export default function FlightSimulator({
             <h2 id="briefing-title">{missionTitle}</h2>
             <p>
               지상 조종자 위치에서 기체를 바라보며 노란 목표지점을
-              순서대로 통과해 주세요. 먼저 기체 시동을 걸면 프로펠러가
-              회전하며, W키 상승 또는 SPACE 자동이륙으로 출발합니다.
+              순서대로 통과해 주세요. 비행장에 입장한 뒤{" "}
+              {deviceMode === "mobile"
+                ? "화면 조종기의 시동 버튼으로"
+                : "M키 또는 상단 전원 버튼으로"}{" "}
+              직접 시동을 걸어야 프로펠러가 회전합니다.
             </p>
             <div className="briefing-meta">
               <div><span>시험 종별</span><strong>{grade}종</strong></div>
@@ -2224,24 +2492,37 @@ export default function FlightSimulator({
               <div><span>평가 단계</span><strong>{stageTotal}단계</strong></div>
             </div>
             <div className="briefing-controls">
-              <span><b>W · S</b> 상승 · 하강</span>
-              <span><b>A · D</b> 러더 좌 · 우</span>
-              <span><b>방향키</b> 전후좌우 이동</span>
-              <span><b>M</b> 기체 시동 · 정지</span>
-              <span><b>SPACE</b> 이륙 · 착륙</span>
+              {deviceMode === "mobile" ? (
+                <>
+                  <span><b>왼쪽 ↑↓</b> 상승 · 하강</span>
+                  <span><b>왼쪽 ←→</b> 러더 좌 · 우</span>
+                  <span><b>오른쪽</b> 전후좌우 이동</span>
+                  <span><b>시동</b> 프로펠러 시작 · 정지</span>
+                  <span><b>자동</b> 이륙 · 착륙</span>
+                </>
+              ) : (
+                <>
+                  <span><b>W · S</b> 상승 · 하강</span>
+                  <span><b>A · D</b> 러더 좌 · 우</span>
+                  <span><b>방향키</b> 전후좌우 이동</span>
+                  <span><b>M</b> 기체 시동 · 정지</span>
+                  <span><b>SPACE</b> 이륙 · 착륙</span>
+                </>
+              )}
             </div>
             <button
               type="button"
               className="dialog-primary"
-              onClick={toggleMotors}
-              aria-keyshortcuts="M"
+              onClick={beginFlight}
               autoFocus
             >
-              기체 시동 걸기
-              <span aria-hidden="true">⏻</span>
+              비행장 입장
+              <span aria-hidden="true">→</span>
             </button>
             <small className="briefing-note">
-              USB 조종기는 MODE 2 기본축으로 작동하며 A 버튼으로 시동을 겁니다.
+              {deviceMode === "mobile"
+                ? "입장 후 화면 하단 시동 버튼을 눌러 수동으로 시동을 겁니다."
+                : "입장 후 키보드 M 또는 USB 조종기 A 버튼으로 수동 시동을 겁니다."}
             </small>
           </section>
         </div>

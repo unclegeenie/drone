@@ -29,6 +29,7 @@ type RotorParts = {
 const DEG_TO_RAD = Math.PI / 180;
 const BODY_CLEARANCE = 0.42;
 const MODEL_SPAN = 2.9;
+const MODEL_VISUAL_SCALE = 1.16;
 
 function beamBetween(
   from: THREE.Vector3,
@@ -383,12 +384,13 @@ export class DroneThreeRenderer {
       dz * Math.cos(PILOT_VIEW_CONFIG.yaw);
     const focal = getPilotFocal(width, height);
     const projectedSpan = depth > 0 ? (MODEL_SPAN * focal) / depth : 0;
+    const visualProjectedSpan = projectedSpan * MODEL_VISUAL_SCALE;
     const mobile = width <= 760;
     const minimumSpan = mobile ? 14 : 18;
     const maximumBoost = mobile ? 1.6 : 1.28;
     const farBoost =
-      projectedSpan > 0 && projectedSpan < minimumSpan
-        ? Math.min(maximumBoost, minimumSpan / projectedSpan)
+      visualProjectedSpan > 0 && visualProjectedSpan < minimumSpan
+        ? Math.min(maximumBoost, minimumSpan / visualProjectedSpan)
         : 1;
     const renderAltitude = Math.max(BODY_CLEARANCE, state.altitude);
     const centerX = width / 2 + (cameraX / Math.max(0.75, depth)) * focal;
@@ -400,7 +402,8 @@ export class DroneThreeRenderer {
     // FHD/QHD에서는 384px, 4K 또는 시험구역보다 가까운 비행에서는
     // 512px로 한 단계만 확장해 로터 끝 잘림과 매 프레임 버퍼 재할당을
     // 동시에 방지합니다.
-    const requiredCrop = projectedSpan * farBoost * 1.25 + 48;
+    const requiredCrop =
+      visualProjectedSpan * farBoost * 1.25 + 48;
     const cropTarget = mobile ? 256 : requiredCrop > 384 ? 512 : 384;
     const cropWidth = Math.min(width, cropTarget);
     const cropHeight = Math.min(height, cropTarget);
@@ -429,16 +432,17 @@ export class DroneThreeRenderer {
     this.yawRoot.visible = depth > 1.5;
     this.yawRoot.position.set(state.x, renderAltitude, -state.z);
     this.yawRoot.rotation.y = -state.yaw * DEG_TO_RAD;
-    this.yawRoot.scale.setScalar(farBoost);
+    this.yawRoot.scale.setScalar(MODEL_VISUAL_SCALE * farBoost);
     this.tiltGroup.rotation.x = -state.pitch * DEG_TO_RAD;
     this.tiltGroup.rotation.z = -state.roll * DEG_TO_RAD;
-    this.detailsGroup.visible = projectedSpan >= 28;
+    this.detailsGroup.visible = visualProjectedSpan >= 28;
 
     this.rotors.forEach((parts) => {
       parts.rotor.rotation.y = state.motorsArmed
         ? parts.phase + state.elapsed * 52 * parts.direction
         : parts.phase;
-      parts.blade.visible = projectedSpan >= 22 || !state.motorsArmed;
+      parts.blade.visible =
+        visualProjectedSpan >= 22 || !state.motorsArmed;
       parts.blade.material.opacity = state.motorsArmed ? 0.34 : 0.82;
       parts.disc.visible = state.motorsArmed;
       parts.disc.material.opacity = state.motorsArmed ? 0.12 : 0;

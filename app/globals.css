@@ -19,6 +19,8 @@
 html {
   min-width: 320px;
   background: var(--navy-950);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -219,6 +221,10 @@ input:focus-visible {
   box-shadow: 0 0 0 5px rgba(103, 189, 131, 0.08), 0 0 13px var(--green);
 }
 
+.mobile-controller-status {
+  cursor: default;
+}
+
 .training-field {
   position: relative;
   min-height: calc(100vh - 74px);
@@ -335,7 +341,8 @@ input:focus-visible {
 
 .grade-segmented,
 .basis-segmented,
-.mode-segmented {
+.mode-segmented,
+.device-segmented {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -366,6 +373,22 @@ input:focus-visible {
 .grade-segmented small {
   color: #8fa8b5;
   font-size: 10px;
+}
+
+.device-segmented button {
+  display: grid;
+  min-height: 44px;
+  place-content: center;
+  gap: 2px;
+}
+
+.device-segmented strong {
+  font-size: 14px;
+}
+
+.device-segmented small {
+  color: #8fa8b5;
+  font-size: 9px;
 }
 
 .mode-segmented button {
@@ -897,7 +920,7 @@ input:focus-visible {
   }
 
   .training-field {
-    padding: 16px 12px 225px;
+    padding: 16px 12px 14px;
   }
 
   .setup-panel {
@@ -949,9 +972,231 @@ input:focus-visible {
   }
 
   .course-status {
+    position: relative;
+    right: auto;
+    bottom: auto;
     width: calc(100vw - 24px);
+    margin: 10px auto 0;
     padding: 17px;
+    transform: none;
   }
+}
+
+.app-shell.device-mobile {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.app-shell.device-mobile .topbar {
+  min-height: 58px;
+  padding: 8px 10px;
+}
+
+.app-shell.device-mobile .brand {
+  gap: 8px;
+}
+
+.app-shell.device-mobile .brand-mark {
+  width: 31px;
+  height: 31px;
+}
+
+.app-shell.device-mobile .brand strong {
+  font-size: 13px;
+}
+
+.app-shell.device-mobile .brand small,
+.app-shell.device-mobile .field-label {
+  display: none;
+}
+
+.app-shell.device-mobile .mobile-controller-status {
+  min-height: 34px;
+  padding: 0 9px;
+  font-size: 10px;
+}
+
+.app-shell.device-mobile .mobile-controller-status::after {
+  content: none;
+}
+
+.app-shell.device-mobile .training-field {
+  min-height: calc(100vh - 58px);
+  overflow: visible;
+  padding: 10px 8px 14px;
+}
+
+.app-shell.device-mobile .setup-panel {
+  width: min(480px, 100%);
+  border-radius: 16px;
+  padding: 14px 12px;
+}
+
+.app-shell.device-mobile .panel-heading {
+  margin-bottom: 11px;
+}
+
+.app-shell.device-mobile .eyebrow {
+  margin-bottom: 4px;
+  font-size: 8px;
+}
+
+.app-shell.device-mobile .panel-heading h1 {
+  font-size: 21px;
+}
+
+.app-shell.device-mobile .panel-heading p {
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.app-shell.device-mobile .setting-group {
+  margin-bottom: 10px;
+}
+
+.app-shell.device-mobile .setting-group legend {
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+
+.app-shell.device-mobile .setting-group legend span {
+  font-size: 10px;
+}
+
+.app-shell.device-mobile .top-settings {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.app-shell.device-mobile .segmented {
+  border-radius: 10px;
+  padding: 2px;
+}
+
+.app-shell.device-mobile .segmented button,
+.app-shell.device-mobile .grade-segmented button,
+.app-shell.device-mobile .device-segmented button {
+  min-height: 40px;
+  border-radius: 8px;
+}
+
+.app-shell.device-mobile .device-segmented strong,
+.app-shell.device-mobile .grade-segmented strong {
+  font-size: 13px;
+}
+
+.app-shell.device-mobile .device-segmented small,
+.app-shell.device-mobile .grade-segmented small {
+  display: block;
+  font-size: 9px;
+}
+
+.app-shell.device-mobile .mode-segmented button,
+.app-shell.device-mobile .basis-segmented button {
+  padding: 0 5px;
+  font-size: 11px;
+}
+
+.app-shell.device-mobile .course-grid {
+  gap: 5px;
+}
+
+.app-shell.device-mobile .course-grid button {
+  min-height: 40px;
+  padding: 4px 18px 4px 6px;
+  font-size: 11px;
+}
+
+.app-shell.device-mobile .common-procedure,
+.app-shell.device-mobile .exam-sequence span {
+  font-size: 10px;
+}
+
+.app-shell.device-mobile .weight-input-row {
+  gap: 10px;
+}
+
+.app-shell.device-mobile .weight-input-row > label {
+  max-width: 95px;
+  font-size: 10px;
+}
+
+.app-shell.device-mobile .number-field {
+  width: 145px;
+}
+
+.app-shell.device-mobile .number-field input {
+  font-size: 18px;
+  padding: 5px 8px 5px 10px;
+}
+
+.app-shell.device-mobile .number-field span {
+  min-width: 38px;
+  font-size: 11px;
+}
+
+.app-shell.device-mobile .range-wrap {
+  margin-top: 6px;
+}
+
+.app-shell.device-mobile .weight-help,
+.app-shell.device-mobile .range-labels {
+  font-size: 10px;
+}
+
+.app-shell.device-mobile .selection-summary {
+  gap: 3px;
+  padding: 7px 9px;
+}
+
+.app-shell.device-mobile .selection-summary > span {
+  font-size: 9px;
+}
+
+.app-shell.device-mobile .selection-summary strong {
+  font-size: 11px;
+}
+
+.app-shell.device-mobile .start-button {
+  min-height: 45px;
+  gap: 9px;
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.app-shell.device-mobile .play-icon {
+  width: 27px;
+  height: 27px;
+}
+
+.app-shell.device-mobile .course-status {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  width: min(480px, 100%);
+  margin: 10px auto 0;
+  border-radius: 15px;
+  padding: 13px;
+  transform: none;
+}
+
+.app-shell.device-mobile .course-status h2 {
+  font-size: 18px;
+}
+
+.app-shell.device-mobile .course-status > p {
+  margin: 5px 0 10px;
+  font-size: 10px;
+}
+
+.app-shell.device-mobile .course-status dl div {
+  padding: 7px 0;
+}
+
+.app-shell.device-mobile .course-status dt,
+.app-shell.device-mobile .course-status dd {
+  font-size: 10px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1118,6 +1363,27 @@ input:focus-visible {
 .motor-pill.is-armed i {
   background: #67d68f;
   box-shadow: 0 0 12px rgba(103, 214, 143, 0.88);
+}
+
+.motor-toggle {
+  appearance: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.motor-toggle b {
+  color: #ffb09d;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.motor-toggle.is-armed b {
+  color: #8ee7ac;
+}
+
+.motor-toggle:disabled {
+  cursor: default;
+  opacity: 0.58;
 }
 
 .hud-action {
@@ -1529,20 +1795,21 @@ input:focus-visible {
   font-size: 8px;
 }
 
-.engine-start-button {
-  border-color: rgba(255, 163, 105, 0.78);
-  background: linear-gradient(135deg, rgba(230, 88, 56, 0.98), rgba(173, 48, 34, 0.97));
-  box-shadow: 0 15px 38px rgba(102, 27, 17, 0.38);
-  color: #fff7f3;
+.auto-flight-button.is-disabled {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: linear-gradient(135deg, rgba(84, 103, 109, 0.9), rgba(49, 69, 77, 0.92));
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+  color: rgba(242, 248, 249, 0.72);
+  cursor: not-allowed;
 }
 
-.engine-start-button > span {
-  background: rgba(42, 10, 6, 0.42);
-  color: #fff7f3;
+.auto-flight-button.is-disabled > span {
+  background: rgba(15, 40, 48, 0.56);
+  color: rgba(242, 248, 249, 0.72);
 }
 
-.engine-start-button small {
-  color: rgba(255, 247, 243, 0.72);
+.auto-flight-button.is-disabled small {
+  color: rgba(223, 235, 238, 0.62);
 }
 
 .flight-overlay {
@@ -1788,57 +2055,164 @@ input:focus-visible {
   right: 14px;
   bottom: max(12px, env(safe-area-inset-bottom));
   display: none;
+  grid-template-columns:
+    minmax(108px, 146px)
+    minmax(62px, auto)
+    minmax(108px, 146px);
   align-items: flex-end;
   justify-content: space-between;
+  gap: clamp(6px, 2vw, 16px);
   pointer-events: none;
 }
 
 .touch-cluster {
   display: grid;
-  width: 150px;
-  height: 150px;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(3, 1fr);
+  width: clamp(108px, 28vw, 146px);
+  min-width: 0;
+  gap: 5px;
   pointer-events: auto;
 }
 
-.touch-cluster button {
-  width: 48px;
-  height: 48px;
+.touch-cluster-label {
+  display: grid;
+  color: rgba(235, 246, 248, 0.72);
+  font-size: 8px;
+  line-height: 1.25;
+  text-align: center;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+}
+
+.touch-cluster-label b {
+  color: #ffffff;
+  font-size: 9px;
+}
+
+.virtual-stick {
+  --stick-x: 0px;
+  --stick-y: 0px;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 50%;
-  background: rgba(5, 32, 41, 0.72);
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.07) 0 7%, transparent 8%),
+    radial-gradient(circle, rgba(5, 32, 41, 0.58), rgba(3, 22, 30, 0.82));
+  box-shadow:
+    inset 0 0 0 10px rgba(255, 255, 255, 0.025),
+    0 10px 26px rgba(0, 0, 0, 0.28);
   color: #f2f8f9;
-  font-size: 16px;
-  font-weight: 760;
+  cursor: grab;
+  padding: 0;
   touch-action: none;
+  user-select: none;
   backdrop-filter: blur(10px);
 }
 
-.touch-cluster button:active {
+.virtual-stick:active {
   border-color: var(--yellow);
-  background: rgba(255, 210, 74, 0.22);
+  cursor: grabbing;
+}
+
+.stick-axis {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: block;
+  background: rgba(255, 255, 255, 0.16);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.stick-axis-horizontal {
+  width: 72%;
+  height: 1px;
+}
+
+.stick-axis-vertical {
+  width: 1px;
+  height: 72%;
+}
+
+.stick-thumb {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  width: 42%;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 38% 32%, rgba(255, 255, 255, 0.28), transparent 30%),
+    linear-gradient(145deg, rgba(41, 82, 96, 0.98), rgba(10, 42, 54, 0.98));
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.34),
+    inset 0 0 0 5px rgba(255, 255, 255, 0.035);
+  pointer-events: none;
+  transform:
+    translate(
+      calc(-50% + var(--stick-x)),
+      calc(-50% + var(--stick-y))
+    );
+}
+
+.stick-thumb i {
+  width: 24%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--yellow);
+  box-shadow: 0 0 10px rgba(255, 210, 74, 0.7);
+}
+
+.touch-actions {
+  display: grid;
+  align-self: end;
+  gap: 7px;
+  padding-bottom: 8px;
+  pointer-events: auto;
+}
+
+.touch-action-button {
+  display: grid;
+  min-width: 62px;
+  min-height: 45px;
+  place-items: center;
+  gap: 1px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 12px;
+  background: rgba(5, 32, 41, 0.78);
+  color: #f1f7f8;
+  font-size: 9px;
+  padding: 5px 7px;
+  touch-action: manipulation;
+  backdrop-filter: blur(10px);
+}
+
+.touch-action-button span {
   color: var(--yellow);
+  font-size: 16px;
+  line-height: 1;
 }
 
-.touch-cluster button:nth-child(1) {
-  grid-column: 2;
-  grid-row: 1;
+.touch-action-button b {
+  font-size: 8px;
+  white-space: nowrap;
 }
 
-.touch-cluster button:nth-child(2) {
-  grid-column: 1;
-  grid-row: 2;
+.touch-action-button.is-armed {
+  border-color: rgba(103, 214, 143, 0.62);
+  background: rgba(20, 72, 47, 0.82);
 }
 
-.touch-cluster button:nth-child(3) {
-  grid-column: 3;
-  grid-row: 2;
+.touch-action-button.is-armed span {
+  color: #8ee7ac;
 }
 
-.touch-cluster button:nth-child(4) {
-  grid-column: 2;
-  grid-row: 3;
+.touch-action-button:disabled {
+  opacity: 0.46;
 }
 
 .sr-only {
@@ -1905,6 +2279,21 @@ input:focus-visible {
 
   .flight-brand small,
   .input-pill {
+    display: none;
+  }
+
+  .motor-toggle {
+    display: flex;
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    min-height: 34px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .motor-toggle i,
+  .motor-toggle span {
     display: none;
   }
 
@@ -2175,17 +2564,18 @@ input:focus-visible {
   .touch-controls {
     left: 8px;
     right: 8px;
+    grid-template-columns: minmax(92px, 1fr) 62px minmax(92px, 1fr);
+    gap: 6px;
   }
 
   .touch-cluster {
-    width: clamp(112px, 34vw, 126px);
-    height: clamp(112px, 34vw, 126px);
+    width: clamp(92px, 30vw, 118px);
   }
 
-  .touch-cluster button {
-    width: clamp(37px, 11.33vw, 42px);
-    height: clamp(37px, 11.33vw, 42px);
-    font-size: 14px;
+  .touch-action-button {
+    min-width: 58px;
+    min-height: 43px;
+    padding: 4px;
   }
 
   .result-stats {
@@ -2193,79 +2583,153 @@ input:focus-visible {
   }
 }
 
-@media (pointer: coarse) {
-  .touch-controls {
-    display: flex;
-  }
+.flight-shell.device-mobile .touch-controls {
+  display: grid;
+}
 
-  .pilot-view-badge {
+.flight-shell.device-mobile {
+  height: 100dvh;
+  min-height: 0;
+}
+
+.flight-shell.device-mobile .touch-cluster:last-child {
+  justify-self: end;
+}
+
+.flight-shell.device-mobile .pilot-view-badge {
+  display: none;
+}
+
+.flight-shell.device-mobile .flight-help,
+.flight-shell.device-mobile .hud-help-toggle,
+.flight-shell.device-mobile .auto-flight-button {
+  display: none;
+}
+
+.flight-shell.device-mobile .flight-warning {
+  top: auto;
+  bottom: 178px;
+}
+
+.flight-shell.device-mobile .flight-topbar {
+  min-height: 58px;
+  padding: 8px 12px;
+}
+
+.flight-shell.device-mobile .mini-drone-mark {
+  width: 34px;
+  height: 34px;
+}
+
+.flight-shell.device-mobile .flight-brand strong {
+  font-size: 13px;
+}
+
+.flight-shell.device-mobile .input-pill {
+  display: none;
+}
+
+.flight-shell.device-mobile .motor-toggle {
+  display: none;
+}
+
+.flight-shell.device-mobile .motor-toggle i,
+.flight-shell.device-mobile .motor-toggle span {
+  display: none;
+}
+
+.flight-shell.device-mobile .flight-hud {
+  left: 10px;
+  right: 10px;
+  top: 70px;
+  gap: 8px;
+}
+
+.flight-shell.device-mobile .objective-card {
+  width: min(60vw, 330px);
+  padding: 12px 13px;
+}
+
+.flight-shell.device-mobile .objective-card h1 {
+  font-size: 18px;
+}
+
+.flight-shell.device-mobile .objective-card > p {
+  margin-bottom: 8px;
+  font-size: 10px;
+}
+
+.flight-shell.device-mobile .telemetry-card {
+  grid-template-columns: repeat(3, minmax(55px, 1fr));
+}
+
+.flight-shell.device-mobile .telemetry-card > div {
+  min-width: 58px;
+  min-height: 58px;
+  padding: 7px;
+}
+
+.flight-shell.device-mobile .telemetry-card strong {
+  font-size: 16px;
+}
+
+@media (min-width: 761px) {
+  .flight-shell.device-mobile .telemetry-card > div:nth-child(n + 4) {
     display: none;
-  }
-
-  .flight-help,
-  .hud-help-toggle,
-  .auto-flight-button {
-    display: none;
-  }
-
-  .flight-warning {
-    bottom: 178px;
   }
 }
 
-@media (max-height: 690px) and (pointer: coarse) {
-  .touch-cluster {
-    width: 126px;
-    height: 126px;
+@media (max-height: 690px) {
+  .flight-shell.device-mobile .touch-cluster {
+    width: clamp(92px, 30vw, 126px);
   }
 
-  .touch-cluster button {
-    width: 42px;
-    height: 42px;
+  .flight-shell.device-mobile .touch-actions {
+    padding-bottom: 4px;
   }
 
-  .flight-hud {
+  .flight-shell.device-mobile .flight-hud {
     top: 65px;
   }
 }
 
-@media (max-height: 520px) and (orientation: landscape) and (pointer: coarse) {
-  .flight-shell {
+@media (max-height: 520px) and (orientation: landscape) {
+  .flight-shell.device-mobile {
     height: 100dvh;
     min-height: 0;
   }
 
-  .flight-topbar {
+  .flight-shell.device-mobile .flight-topbar {
     min-height: 44px;
     padding:
       4px max(8px, env(safe-area-inset-right))
       4px max(8px, env(safe-area-inset-left));
   }
 
-  .mini-drone-mark,
-  .flight-brand small,
-  .input-pill {
+  .flight-shell.device-mobile .mini-drone-mark,
+  .flight-shell.device-mobile .flight-brand small,
+  .flight-shell.device-mobile .input-pill {
     display: none;
   }
 
-  .flight-brand strong {
+  .flight-shell.device-mobile .flight-brand strong {
     font-size: 11px;
   }
 
-  .hud-action {
+  .flight-shell.device-mobile .hud-action {
     min-width: 30px;
     height: 30px;
   }
 
-  .guide-mode-toggle {
+  .flight-shell.device-mobile .guide-mode-toggle {
     padding: 0 7px;
   }
 
-  .guide-mode-toggle span {
+  .flight-shell.device-mobile .guide-mode-toggle span {
     display: none;
   }
 
-  .flight-hud {
+  .flight-shell.device-mobile .flight-hud {
     left: max(8px, env(safe-area-inset-left));
     right: max(8px, env(safe-area-inset-right));
     top: 50px;
@@ -2273,21 +2737,21 @@ input:focus-visible {
     gap: 7px;
   }
 
-  .objective-card {
+  .flight-shell.device-mobile .objective-card {
     width: 220px;
     padding: 7px 9px;
   }
 
-  .objective-heading {
+  .flight-shell.device-mobile .objective-heading {
     margin-bottom: 2px;
     font-size: 7px;
   }
 
-  .objective-card h1 {
+  .flight-shell.device-mobile .objective-card h1 {
     font-size: 13px;
   }
 
-  .objective-card > p {
+  .flight-shell.device-mobile .objective-card > p {
     overflow: hidden;
     margin: 2px 0 5px;
     font-size: 8px;
@@ -2295,84 +2759,81 @@ input:focus-visible {
     white-space: nowrap;
   }
 
-  .target-hold {
+  .flight-shell.device-mobile .target-hold {
     margin-top: 3px;
   }
 
-  .telemetry-card > div {
+  .flight-shell.device-mobile .telemetry-card > div {
     min-width: 54px;
     min-height: 46px;
     padding: 4px;
   }
 
-  .telemetry-card strong {
+  .flight-shell.device-mobile .telemetry-card strong {
     font-size: 13px;
   }
 
-  .touch-controls {
+  .flight-shell.device-mobile .touch-controls {
     left: max(8px, env(safe-area-inset-left));
     right: max(8px, env(safe-area-inset-right));
     bottom: max(5px, env(safe-area-inset-bottom));
   }
 
-  .touch-cluster {
+  .flight-shell.device-mobile .touch-cluster {
     width: 120px;
-    height: 120px;
   }
 
-  .touch-cluster button {
-    width: 40px;
-    height: 40px;
-    font-size: 14px;
+  .flight-shell.device-mobile .touch-action-button {
+    min-height: 40px;
   }
 
-  .flight-overlay {
+  .flight-shell.device-mobile .flight-overlay {
     padding: 4px 8px;
   }
 
-  .flight-dialog,
-  .briefing-dialog {
+  .flight-shell.device-mobile .flight-dialog,
+  .flight-shell.device-mobile .briefing-dialog {
     width: min(680px, 100%);
     max-height: calc(100dvh - 8px);
     border-radius: 13px;
     padding: 10px 14px;
   }
 
-  .dialog-kicker {
+  .flight-shell.device-mobile .dialog-kicker {
     margin-bottom: 3px;
   }
 
-  .flight-dialog h2 {
+  .flight-shell.device-mobile .flight-dialog h2 {
     font-size: 18px;
   }
 
-  .briefing-dialog > p,
-  .briefing-note {
+  .flight-shell.device-mobile .briefing-dialog > p,
+  .flight-shell.device-mobile .briefing-note {
     display: none;
   }
 
-  .briefing-meta {
+  .flight-shell.device-mobile .briefing-meta {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     margin: 6px 0;
   }
 
-  .briefing-meta div {
+  .flight-shell.device-mobile .briefing-meta div {
     border-bottom: 0 !important;
     padding: 5px;
   }
 
-  .briefing-controls {
+  .flight-shell.device-mobile .briefing-controls {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 4px;
     margin-bottom: 6px;
   }
 
-  .briefing-controls span,
-  .briefing-controls span:last-child:nth-child(odd) {
+  .flight-shell.device-mobile .briefing-controls span,
+  .flight-shell.device-mobile .briefing-controls span:last-child:nth-child(odd) {
     grid-column: auto;
   }
 
-  .briefing-controls span {
+  .flight-shell.device-mobile .briefing-controls span {
     display: grid;
     min-height: 34px;
     justify-content: center;
@@ -2382,12 +2843,12 @@ input:focus-visible {
     text-align: center;
   }
 
-  .briefing-controls b {
+  .flight-shell.device-mobile .briefing-controls b {
     min-width: 0;
     font-size: 8px;
   }
 
-  .dialog-primary {
+  .flight-shell.device-mobile .dialog-primary {
     min-height: 38px;
     font-size: 12px;
   }

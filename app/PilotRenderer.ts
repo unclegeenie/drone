@@ -100,7 +100,9 @@ export function distanceFromPilot(x: number, z: number) {
 }
 
 export function getPilotFocal(width: number, height: number) {
-  return Math.min(width * 0.5, height * 0.89);
+  // 시험장과 기체가 기존보다 약 8% 가까이 보이도록 시야를 살짝 당깁니다.
+  // 전체 코스가 화면 안에 남도록 과도한 줌은 피합니다.
+  return Math.min(width * 0.54, height * 0.96);
 }
 
 function toViewSpace(x: number, z: number) {
@@ -572,13 +574,15 @@ function drawCourseCone(
   markerIndex: number,
 ) {
   const base = projectWorld(marker.x, 0.02, marker.z, width, height);
-  const tip = projectWorld(marker.x, 0.82, marker.z, width, height);
+  // 실제 시험장에서 식별하기 쉬운 세장형 라바콘 비율을 반영합니다.
+  // 바닥 폭은 그대로 두고 높이만 키워 원거리에서도 겹치지 않게 합니다.
+  const tip = projectWorld(marker.x, 1.18, marker.z, width, height);
   if (!base.visible || !tip.visible) return;
 
   const left = projectWorld(marker.x - 0.38, 0.02, marker.z, width, height);
   const right = projectWorld(marker.x + 0.38, 0.02, marker.z, width, height);
   const coneWidth = clamp(Math.abs(right.x - left.x), 5, 34);
-  const coneHeight = clamp(base.y - tip.y, 8, 62);
+  const coneHeight = clamp(base.y - tip.y, 10, 82);
   const baseHeight = clamp(coneWidth * 0.22, 2.2, 8);
   const intensity = getDownwashIntensity(state, marker);
 
@@ -1354,7 +1358,7 @@ function drawDrone(
 
   // 이미지 폭이 실제 약 2.9m 기체의 각크기와 맞도록 원근 비례를 사용합니다.
   // 먼 지점에서 강제로 크게 보이던 최소 크기를 낮춰 40~60m 거리감이 유지됩니다.
-  const droneSize = clamp((drone.focal / drone.depth) * 1.15, 11, 96);
+  const droneSize = clamp((drone.focal / drone.depth) * 1.32, 13, 112);
   const yawRadians = (state.yaw * Math.PI) / 180 - VIEW_YAW;
   const yawCosine = Math.cos(yawRadians);
   const yawSine = Math.sin(yawRadians);

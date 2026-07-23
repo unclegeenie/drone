@@ -6,6 +6,7 @@ import FlightSimulator from "./FlightSimulator";
 type Grade = "1" | "2";
 type WeightBasis = "airframe" | "mtow";
 type TrainingMode = "course" | "exam";
+type DeviceMode = "pc" | "mobile";
 
 type Course = {
   id: string;
@@ -127,6 +128,7 @@ export default function Home() {
   const [courseId, setCourseId] = useState("triangle");
   const [weightBasis, setWeightBasis] = useState<WeightBasis>("mtow");
   const [weight, setWeight] = useState(32);
+  const [deviceMode, setDeviceMode] = useState<DeviceMode>("pc");
   const [controller, setController] = useState<{
     connected: boolean;
     name?: string;
@@ -149,6 +151,23 @@ export default function Home() {
   const sliderProgress = useMemo(() => {
     return ((weight - range.min) / (range.max - range.min)) * 100;
   }, [range, weight]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const savedMode = window.localStorage.getItem("drone-device-mode");
+      if (savedMode === "pc" || savedMode === "mobile") {
+        setDeviceMode(savedMode);
+        return;
+      }
+
+      const mobileDevice =
+        window.matchMedia?.("(pointer: coarse)").matches ||
+        window.innerWidth <= 760;
+      if (mobileDevice) setDeviceMode("mobile");
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     const readController = () => {
@@ -207,6 +226,16 @@ export default function Home() {
     );
   };
 
+  const selectDeviceMode = (nextMode: DeviceMode) => {
+    setDeviceMode(nextMode);
+    window.localStorage.setItem("drone-device-mode", nextMode);
+    setNotice(
+      nextMode === "mobile"
+        ? "모바일 화면과 가상 조종기를 사용합니다."
+        : "PC 화면과 키보드·USB 조종기 입력을 사용합니다.",
+    );
+  };
+
   const startSimulation = () => {
     setNotice(null);
     setIsFlying(true);
@@ -221,7 +250,8 @@ export default function Home() {
         courseLabel={selectedCourse.label}
         weight={weight}
         weightBasisLabel={BASIS_LABELS[weightBasis]}
-        controllerName={controller.name}
+        deviceMode={deviceMode}
+        controllerName={deviceMode === "pc" ? controller.name : undefined}
         onExit={() => {
           setIsFlying(false);
           setNotice("비행 설정 화면으로 돌아왔습니다.");
@@ -231,7 +261,7 @@ export default function Home() {
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell device-${deviceMode}`}>
       <header className="topbar">
         <div className="brand" aria-label="드론 실기 시뮬레이터">
           <span className="brand-mark" aria-hidden="true">
@@ -249,19 +279,30 @@ export default function Home() {
 
         <div className="topbar-actions">
           <span className="field-label">가상 훈련장 01</span>
-          <button
-            type="button"
-            className={`controller-button ${controller.connected ? "is-connected" : ""}`}
-            onClick={scanController}
-            aria-label={
-              controller.connected
-                ? `조종기 연결됨: ${controller.name}`
-                : "USB 조종기 연결 확인"
-            }
-          >
-            <span className="status-dot" aria-hidden="true" />
-            {controller.connected ? "조종기 연결됨" : "조종기 연결 대기"}
-          </button>
+          {deviceMode === "mobile" ? (
+            <span
+              className="controller-button mobile-controller-status is-connected"
+              role="status"
+              aria-label="화면 가상 조종기 사용"
+            >
+              <span className="status-dot" aria-hidden="true" />
+              화면 조종기
+            </span>
+          ) : (
+            <button
+              type="button"
+              className={`controller-button ${controller.connected ? "is-connected" : ""}`}
+              onClick={scanController}
+              aria-label={
+                controller.connected
+                  ? `조종기 연결됨: ${controller.name}`
+                  : "USB 조종기 연결 확인"
+              }
+            >
+              <span className="status-dot" aria-hidden="true" />
+              {controller.connected ? "조종기 연결됨" : "조종기 연결 대기"}
+            </button>
+          )}
         </div>
       </header>
 
@@ -280,6 +321,33 @@ export default function Home() {
             <h1>비행 훈련 설정</h1>
             <p>시험 종별과 훈련 방식, 기체 무게 기준을 선택해 주세요.</p>
           </div>
+
+          <fieldset className="setting-group device-setting">
+            <legend>
+              화면·조작 모드
+              <span>{deviceMode === "mobile" ? "화면 조종기" : "키보드·USB"}</span>
+            </legend>
+            <div className="segmented device-segmented">
+              <button
+                type="button"
+                className={deviceMode === "pc" ? "is-active" : ""}
+                onClick={() => selectDeviceMode("pc")}
+                aria-pressed={deviceMode === "pc"}
+              >
+                <strong>PC</strong>
+                <small>키보드·USB 조종기</small>
+              </button>
+              <button
+                type="button"
+                className={deviceMode === "mobile" ? "is-active" : ""}
+                onClick={() => selectDeviceMode("mobile")}
+                aria-pressed={deviceMode === "mobile"}
+              >
+                <strong>모바일</strong>
+                <small>화면 가상 조종기</small>
+              </button>
+            </div>
+          </fieldset>
 
           <div className="top-settings">
             <fieldset className="setting-group compact-setting">
@@ -493,6 +561,10 @@ export default function Home() {
             <div>
               <dt>훈련 방식</dt>
               <dd>{trainingMode === "exam" ? "전체 시험" : "코스별 연습"}</dd>
+            </div>
+            <div>
+              <dt>화면 모드</dt>
+              <dd>{deviceMode === "mobile" ? "모바일" : "PC"}</dd>
             </div>
             <div>
               <dt>중량 기준</dt>
