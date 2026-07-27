@@ -1401,6 +1401,57 @@ function drawDrone(
       groundPlaneSquash * yawSine * x +
       yawCosine * y,
   });
+  const drawNavigationLights = (
+    frontPositions: Array<[number, number]>,
+    rearPositions: Array<[number, number]>,
+  ) => {
+    const drawLightSet = (
+      positions: Array<[number, number]>,
+      activeColor: string,
+      inactiveColor: string,
+      glowColor: string,
+    ) => {
+      context.fillStyle = state.motorsArmed
+        ? activeColor
+        : inactiveColor;
+      context.shadowColor = state.motorsArmed
+        ? glowColor
+        : "transparent";
+      context.shadowBlur = state.motorsArmed
+        ? Math.max(7, droneSize * 0.19)
+        : 0;
+      positions.forEach(([x, y]) => {
+        const light = yawPoint(x, y);
+        context.beginPath();
+        context.arc(
+          light.x,
+          light.y,
+          Math.max(1.5, droneSize * 0.034),
+          0,
+          Math.PI * 2,
+        );
+        context.fill();
+      });
+    };
+
+    context.save();
+    context.globalCompositeOperation = state.motorsArmed
+      ? "lighter"
+      : "source-over";
+    drawLightSet(
+      frontPositions,
+      "#ff3328",
+      "#5d2420",
+      "rgba(255, 43, 32, 0.98)",
+    );
+    drawLightSet(
+      rearPositions,
+      "#38f77a",
+      "#204f31",
+      "rgba(53, 255, 117, 0.98)",
+    );
+    context.restore();
+  };
 
   context.save();
   context.translate(drone.x, drone.y);
@@ -1480,23 +1531,16 @@ function drawDrone(
       context.restore();
     });
 
-    const navigationLight = yawPoint(0, -imageHeight * 0.14);
-    context.fillStyle = state.motorsArmed ? "#ffd24a" : "#8a979a";
-    context.shadowColor = state.motorsArmed
-      ? "rgba(255, 210, 74, 0.95)"
-      : "transparent";
-    context.shadowBlur = state.motorsArmed
-      ? Math.max(4, droneSize * 0.12)
-      : 0;
-    context.beginPath();
-    context.arc(
-      navigationLight.x,
-      navigationLight.y,
-      Math.max(1.4, droneSize * 0.027),
-      0,
-      Math.PI * 2,
+    drawNavigationLights(
+      [
+        [-imageWidth * 0.16, -imageHeight * 0.22],
+        [imageWidth * 0.16, -imageHeight * 0.22],
+      ],
+      [
+        [-imageWidth * 0.16, imageHeight * 0.24],
+        [imageWidth * 0.16, imageHeight * 0.24],
+      ],
     );
-    context.fill();
     context.restore();
     return;
   }
@@ -1528,7 +1572,12 @@ function drawDrone(
   rotorPositions.forEach(([x, y], rotorIndex) => {
     const rotor = yawPoint(x * droneSize, y * droneSize);
     context.fillStyle = "rgba(8, 29, 35, 0.9)";
-    context.strokeStyle = rotorIndex % 2 === 0 ? "#ff8d79" : "#74d89a";
+    context.strokeStyle =
+      rotorIndex < 2
+        ? "#ff8d79"
+        : rotorIndex >= 4
+          ? "#74d89a"
+          : "rgba(238, 249, 250, 0.55)";
     context.lineWidth = Math.max(1, droneSize * 0.025);
     context.beginPath();
     context.ellipse(
@@ -1580,19 +1629,16 @@ function drawDrone(
   context.stroke();
   context.restore();
 
-  const navigationLight = yawPoint(0, -droneSize * 0.18);
-  context.fillStyle = "#ffd24a";
-  context.shadowColor = "rgba(255, 210, 74, 0.85)";
-  context.shadowBlur = Math.max(3, droneSize * 0.08);
-  context.beginPath();
-  context.arc(
-    navigationLight.x,
-    navigationLight.y,
-    Math.max(1.4, droneSize * 0.032),
-    0,
-    Math.PI * 2,
+  drawNavigationLights(
+    [
+      [-droneSize * 0.31, -droneSize * 0.2],
+      [droneSize * 0.31, -droneSize * 0.2],
+    ],
+    [
+      [-droneSize * 0.31, droneSize * 0.21],
+      [droneSize * 0.31, droneSize * 0.21],
+    ],
   );
-  context.fill();
   context.restore();
 }
 

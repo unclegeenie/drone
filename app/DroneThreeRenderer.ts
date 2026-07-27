@@ -26,10 +26,35 @@ type RotorParts = {
   phase: number;
 };
 
+type NavigationLensParts = {
+  lens: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
+  onColor: THREE.Color;
+  offColor: THREE.Color;
+};
+
 const DEG_TO_RAD = Math.PI / 180;
 const BODY_CLEARANCE = 0.42;
 const MODEL_SPAN = 2.9;
 const MODEL_VISUAL_SCALE = 1.16;
+
+function createLedGlowTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 64;
+  const context = canvas.getContext("2d");
+  if (context) {
+    const glow = context.createRadialGradient(32, 32, 1, 32, 32, 32);
+    glow.addColorStop(0, "rgba(255, 255, 255, 1)");
+    glow.addColorStop(0.16, "rgba(255, 255, 255, 0.96)");
+    glow.addColorStop(0.46, "rgba(255, 255, 255, 0.42)");
+    glow.addColorStop(1, "rgba(255, 255, 255, 0)");
+    context.fillStyle = glow;
+    context.fillRect(0, 0, 64, 64);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
 
 function beamBetween(
   from: THREE.Vector3,
@@ -62,6 +87,11 @@ export class DroneThreeRenderer {
   private readonly tiltGroup = new THREE.Group();
   private readonly detailsGroup = new THREE.Group();
   private readonly rotors: RotorParts[] = [];
+  private readonly navigationLenses: NavigationLensParts[] = [];
+  private readonly navigationGlows: Array<
+    THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>
+  > = [];
+  private readonly ledGlowTexture: THREE.CanvasTexture;
   private contextLost = false;
   private disposed = false;
   private lastBufferWidth = 0;
@@ -95,6 +125,7 @@ export class DroneThreeRenderer {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.08;
     this.renderer.shadowMap.enabled = false;
+    this.ledGlowTexture = createLedGlowTexture();
 
     this.canvas.addEventListener("webglcontextlost", this.handleContextLost);
     this.canvas.addEventListener(
@@ -160,12 +191,14 @@ export class DroneThreeRenderer {
       side: THREE.DoubleSide,
     });
 
+    // 사진 속 흰색 약제 탱크가 파란 상부 커버보다 아래로 길게 내려오는
+    // 비율을 반영합니다.
     const lowerBody = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.38, 0.42, 0.23, 8),
+      new THREE.CylinderGeometry(0.35, 0.41, 0.34, 8),
       white,
     );
-    lowerBody.scale.set(0.84, 1, 1.08);
-    lowerBody.position.y = -0.05;
+    lowerBody.scale.set(0.86, 1, 1.08);
+    lowerBody.position.y = -0.1;
     this.tiltGroup.add(lowerBody);
 
     const bodyBand = new THREE.Mesh(
@@ -177,11 +210,11 @@ export class DroneThreeRenderer {
     this.tiltGroup.add(bodyBand);
 
     const upperBody = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.31, 0.37, 0.23, 8),
+      new THREE.SphereGeometry(0.36, 16, 8),
       blue,
     );
-    upperBody.scale.set(0.86, 1, 1.07);
-    upperBody.position.y = 0.25;
+    upperBody.scale.set(0.88, 0.43, 1.04);
+    upperBody.position.y = 0.24;
     this.tiltGroup.add(upperBody);
 
     const nosePanel = new THREE.Mesh(
@@ -287,25 +320,71 @@ export class DroneThreeRenderer {
     });
     this.tiltGroup.add(this.detailsGroup);
 
-    const frontLedMaterial = new THREE.MeshStandardMaterial({
-      color: 0xff5e4f,
-      emissive: 0xff2d20,
-      emissiveIntensity: 3.2,
-    });
-    const rearLedMaterial = new THREE.MeshStandardMaterial({
-      color: 0x62e69a,
-      emissive: 0x20c66a,
-      emissiveIntensity: 2.8,
-    });
-    const ledGeometry = new THREE.SphereGeometry(0.035, 8, 6);
-    [-0.14, 0.14].forEach((x) => {
-      const frontLed = new THREE.Mesh(ledGeometry, frontLedMaterial);
-      frontLed.position.set(x, 0.17, -0.38);
-      this.tiltGroup.add(frontLed);
-      const rearLed = new THREE.Mesh(ledGeometry, rearLedMaterial);
-      rearLed.position.set(x, 0.16, 0.37);
-      this.tiltGroup.add(rearLed);
-    });
+    // 기수는 -Z 방향입니다. 사진처럼 전·후 사선 암의 바깥쪽에
+    // 방향 표시등을 두어 러더 회전 중에도 앞뒤를 판별할 수 있게 합니다.
+    const ledGeometry = new THREE.SphereGeometry(0.05, 10, 7);
+    const addNavigationLenses = (
+      positions: Array<[number, number, number]>,
+      onColor: number,
+      offColor: number,
+    ) => {
+      positions.forEach(([x, y, z]) => {
+        const material = new THREE.MeshBasicMaterial({
+          color: offColor,
+          toneMapped: false,
+        });
+        const lens = new THREE.Mesh(ledGeometry, material);
+        lens.position.set(x, y, z);
+        this.tiltGroup.add(lens);
+        this.navigationLenses.push({
+          lens,
+          onColor: new THREE.Color(onColor),
+          offColor: new THREE.Color(offColor),
+        });
+      });
+    };
+
+    const addNavigationGlow = (
+      positions: Array<[number, number, number]>,
+      color: number,
+    ) => {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions.flat(), 3),
+      );
+      const material = new THREE.PointsMaterial({
+        color,
+        map: this.ledGlowTexture,
+        size: 8,
+        sizeAttenuation: false,
+        transparent: true,
+        opacity: 0.9,
+        alphaTest: 0.02,
+        depthWrite: false,
+        depthTest: true,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      });
+      const glow = new THREE.Points(geometry, material);
+      glow.visible = false;
+      glow.renderOrder = 3;
+      this.tiltGroup.add(glow);
+      this.navigationGlows.push(glow);
+    };
+
+    const frontLedPositions: Array<[number, number, number]> = [
+      [-0.43, 0.17, -0.75],
+      [0.43, 0.17, -0.75],
+    ];
+    const rearLedPositions: Array<[number, number, number]> = [
+      [-0.43, 0.17, 0.75],
+      [0.43, 0.17, 0.75],
+    ];
+    addNavigationLenses(frontLedPositions, 0xff2b20, 0x4a1714);
+    addNavigationLenses(rearLedPositions, 0x35ff75, 0x123f24);
+    addNavigationGlow(frontLedPositions, 0xff2b20);
+    addNavigationGlow(rearLedPositions, 0x35ff75);
   }
 
   private configureView(
@@ -458,6 +537,14 @@ export class DroneThreeRenderer {
       parts.disc.material.opacity = state.motorsArmed ? 0.12 : 0;
     });
 
+    this.navigationLenses.forEach(({ lens, onColor, offColor }) => {
+      lens.material.color.copy(state.motorsArmed ? onColor : offColor);
+    });
+    this.navigationGlows.forEach((glow) => {
+      glow.visible = state.motorsArmed;
+      glow.material.size = mobile ? 8 : 7;
+    });
+
     this.renderer.render(this.scene, this.camera);
     return {
       canvas: this.canvas,
@@ -483,7 +570,12 @@ export class DroneThreeRenderer {
     const geometries = new Set<THREE.BufferGeometry>();
     const materials = new Set<THREE.Material>();
     this.scene.traverse((object) => {
-      if (!(object instanceof THREE.Mesh)) return;
+      if (
+        !(object instanceof THREE.Mesh) &&
+        !(object instanceof THREE.Points)
+      ) {
+        return;
+      }
       geometries.add(object.geometry);
       const objectMaterials = Array.isArray(object.material)
         ? object.material
@@ -492,6 +584,7 @@ export class DroneThreeRenderer {
     });
     geometries.forEach((geometry) => geometry.dispose());
     materials.forEach((material) => material.dispose());
+    this.ledGlowTexture.dispose();
     this.renderer.dispose();
     this.renderer.forceContextLoss();
   }
