@@ -15,7 +15,11 @@ import {
   distanceFromPilot,
   drawPilotScene,
 } from "./PilotRenderer";
-import type { PilotDroneLayer, PilotGuideMode } from "./PilotRenderer";
+import type {
+  PilotDroneLayer,
+  PilotGuideMode,
+  PilotWindState,
+} from "./PilotRenderer";
 import type {
   DroneThreeRenderer as DroneThreeRendererInstance,
 } from "./DroneThreeRenderer";
@@ -154,6 +158,12 @@ const ATTI_HORIZONTAL_ACCELERATION = 2.1;
 const ATTI_AIR_DRAG = 0.34;
 const ATTI_AMBIENT_WIND_X = 0.065;
 const ATTI_AMBIENT_WIND_Z = 0.022;
+const CROSSWIND_DIRECTION_X = -1;
+const CROSSWIND_DIRECTION_Z = 0;
+const CROSSWIND_SPEED_MPS = 2.4;
+const CROSSWIND_FORCE_PER_MPS = 0.27;
+const CROSSWIND_GUST_FORCE = 0.18;
+const CALM_WIND_SPEED_MPS = 0.45;
 
 const smoothstep = (edge0: number, edge1: number, value: number) => {
   const progress = clamp((value - edge0) / (edge1 - edge0), 0, 1);
@@ -2000,7 +2010,13 @@ export default function FlightSimulator({
           activeWaypoint?.stage.includes("측풍") ||
           (trainingMode === "course" && courseId === "crosswind");
         if (state.motorsArmed && windActive && state.altitude > 0.2) {
-          state.vx += (0.65 + Math.sin(state.elapsed * 0.8) * 0.18) * delta;
+          const crosswindForce =
+            CROSSWIND_SPEED_MPS * CROSSWIND_FORCE_PER_MPS +
+            Math.sin(state.elapsed * 0.8) * CROSSWIND_GUST_FORCE;
+          state.vx +=
+            CROSSWIND_DIRECTION_X * crosswindForce * delta;
+          state.vz +=
+            CROSSWIND_DIRECTION_Z * crosswindForce * delta;
         }
 
         const horizontalSpeed = Math.hypot(state.vx, state.vz);
@@ -2203,6 +2219,14 @@ export default function FlightSimulator({
       const windActive =
         Boolean(activeWaypoint?.stage.includes("측풍")) ||
         (trainingMode === "course" && courseId === "crosswind");
+      const wind = {
+        active: windActive,
+        directionX: CROSSWIND_DIRECTION_X,
+        directionZ: CROSSWIND_DIRECTION_Z,
+        speedMps: windActive
+          ? CROSSWIND_SPEED_MPS
+          : CALM_WIND_SPEED_MPS,
+      } satisfies PilotWindState;
       context.setTransform(
         viewport.ratio,
         0,
@@ -2235,6 +2259,8 @@ export default function FlightSimulator({
           droneImage: droneImageRef.current,
           droneLayer,
           guideMode: guideModeRef.current,
+          wind,
+          animationTime: time / 1000,
         },
       );
 
@@ -2561,8 +2587,8 @@ export default function FlightSimulator({
         </div>
       ) : windActive ? (
         <div className="wind-indicator" role="status">
-          <span aria-hidden="true">➜</span>
-          측풍 동→서 2.4 m/s
+          <span aria-hidden="true">←</span>
+          측풍 동→서 {CROSSWIND_SPEED_MPS.toFixed(1)} m/s
         </div>
       ) : null}
 

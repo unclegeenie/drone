@@ -49,10 +49,19 @@ export type PilotDroneLayer = {
   height: number;
 };
 
+export type PilotWindState = {
+  active: boolean;
+  directionX: number;
+  directionZ: number;
+  speedMps: number;
+};
+
 export type PilotSceneOptions = {
   droneImage?: HTMLImageElement | null;
   droneLayer?: PilotDroneLayer | null;
   guideMode?: PilotGuideMode;
+  wind?: PilotWindState;
+  animationTime?: number;
 };
 
 export const PILOT_CAMERA = {
@@ -435,6 +444,238 @@ function drawCourseInfrastructure(
     "rgba(246, 204, 71, 0.8)",
     "rgba(255, 249, 220, 0.9)",
   );
+}
+
+function drawWindStreamer(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  wind: PilotWindState,
+  animationTime: number,
+) {
+  // 실제 시험장 사진의 우측 경계에 놓인 풍향 천 라바콘 위치입니다.
+  // 코스 라바콘과 분리해 드론 하강풍이 아닌 주변 바람에 계속 반응합니다.
+  const marker = { x: 19, z: -6 };
+  const markerHeight = 1.22;
+  const base = projectWorld(marker.x, 0.02, marker.z, width, height);
+  const tip = projectWorld(
+    marker.x,
+    markerHeight,
+    marker.z,
+    width,
+    height,
+  );
+  if (!base.visible || !tip.visible) return;
+
+  const left = projectWorld(
+    marker.x - 0.42,
+    0.02,
+    marker.z,
+    width,
+    height,
+  );
+  const right = projectWorld(
+    marker.x + 0.42,
+    0.02,
+    marker.z,
+    width,
+    height,
+  );
+  const coneWidth = clamp(Math.abs(right.x - left.x), 6, 34);
+  const coneHeight = clamp(base.y - tip.y, 12, 78);
+  const baseHeight = clamp(coneWidth * 0.22, 2.4, 8);
+  const bodyBottomY = base.y - baseHeight * 0.44;
+  const bodyHalf = coneWidth * 0.39;
+  const topHalf = coneWidth * 0.07;
+
+  context.save();
+  context.fillStyle = "rgba(24, 29, 29, 0.94)";
+  roundedRect(
+    context,
+    base.x - coneWidth * 0.6,
+    base.y - baseHeight * 0.54,
+    coneWidth * 1.2,
+    baseHeight,
+    Math.max(1, baseHeight * 0.22),
+  );
+  context.fill();
+
+  context.fillStyle = "#ee5a32";
+  context.strokeStyle = "rgba(255, 221, 184, 0.92)";
+  context.lineWidth = clamp(coneWidth * 0.045, 0.8, 1.7);
+  context.beginPath();
+  context.moveTo(base.x - bodyHalf, bodyBottomY);
+  context.lineTo(tip.x - topHalf, tip.y);
+  context.lineTo(tip.x + topHalf, tip.y);
+  context.lineTo(base.x + bodyHalf, bodyBottomY);
+  context.closePath();
+  context.fill();
+  context.stroke();
+
+  const bodySlice = (progress: number) => {
+    const centerX = base.x + (tip.x - base.x) * progress;
+    const centerY = bodyBottomY + (tip.y - bodyBottomY) * progress;
+    const halfWidth =
+      bodyHalf * (1 - progress) + topHalf * progress;
+    return { centerX, centerY, halfWidth };
+  };
+  const stripeBottom = bodySlice(0.38);
+  const stripeTop = bodySlice(0.57);
+  context.fillStyle = "rgba(255, 250, 232, 0.98)";
+  context.beginPath();
+  context.moveTo(
+    stripeBottom.centerX - stripeBottom.halfWidth,
+    stripeBottom.centerY,
+  );
+  context.lineTo(
+    stripeTop.centerX - stripeTop.halfWidth,
+    stripeTop.centerY,
+  );
+  context.lineTo(
+    stripeTop.centerX + stripeTop.halfWidth,
+    stripeTop.centerY,
+  );
+  context.lineTo(
+    stripeBottom.centerX + stripeBottom.halfWidth,
+    stripeBottom.centerY,
+  );
+  context.closePath();
+  context.fill();
+
+  let flowX = wind.directionX;
+  let flowZ = wind.directionZ;
+  const flowLength = Math.hypot(flowX, flowZ) || 1;
+  flowX /= flowLength;
+  flowZ /= flowLength;
+  const flowPoint = projectWorld(
+    marker.x + flowX * 2.8,
+    markerHeight - 0.06,
+    marker.z + flowZ * 2.8,
+    width,
+    height,
+  );
+  let screenFlowX = flowPoint.x - tip.x;
+  let screenFlowY = flowPoint.y - tip.y;
+  const screenFlowLength = Math.hypot(screenFlowX, screenFlowY) || 1;
+  screenFlowX /= screenFlowLength;
+  screenFlowY /= screenFlowLength;
+
+  const windStrength = clamp(wind.speedMps / 3.2, 0, 1);
+  const directionalWeight = 0.12 + windStrength * 0.88;
+  const droopWeight = (1 - windStrength) * 1.08;
+  let ribbonDirectionX = screenFlowX * directionalWeight;
+  let ribbonDirectionY =
+    screenFlowY * directionalWeight + droopWeight;
+  const ribbonDirectionLength =
+    Math.hypot(ribbonDirectionX, ribbonDirectionY) || 1;
+  ribbonDirectionX /= ribbonDirectionLength;
+  ribbonDirectionY /= ribbonDirectionLength;
+  const perpendicularX = -ribbonDirectionY;
+  const perpendicularY = ribbonDirectionX;
+
+  const ribbonColors = [
+    "#159bc9",
+    "#f5ce3c",
+    "#2cb4dc",
+    "#f8df67",
+    "#168fbf",
+    "#f2c130",
+    "#41c1e3",
+    "#ffe177",
+    "#198db8",
+    "#f1bf2d",
+    "#32b9dd",
+    "#f7d451",
+    "#087da9",
+    "#ffdf63",
+    "#44c6e4",
+    "#efb827",
+  ];
+  const visibleRibbons =
+    width <= 520 && coneHeight < 24
+      ? ribbonColors.slice(0, 9)
+      : ribbonColors;
+  const middleRibbon = (visibleRibbons.length - 1) / 2;
+
+  visibleRibbons.forEach((color, index) => {
+    const lane =
+      (index - middleRibbon) / Math.max(1, middleRibbon);
+    const primaryFlutter = Math.sin(
+      animationTime * (4.8 + (index % 5) * 0.52) +
+        index * 1.37,
+    );
+    const fineFlutter = Math.sin(
+      animationTime * (9.4 + (index % 3) * 0.86) +
+        index * 2.11,
+    );
+    const flutter = primaryFlutter * 0.7 + fineFlutter * 0.3;
+    const ribbonLength = clamp(
+      coneHeight *
+        (0.78 + windStrength * 1.5) *
+        (0.88 + (index % 4) * 0.055),
+      9,
+      58,
+    );
+    const spread =
+      (lane * (0.08 + windStrength * 0.22) +
+        flutter * (0.04 + windStrength * 0.2)) *
+      ribbonLength;
+    const anchorX = tip.x + lane * coneWidth * 0.1;
+    const anchorY = tip.y + 1 + Math.abs(lane) * 0.45;
+    const endX =
+      anchorX +
+      ribbonDirectionX * ribbonLength +
+      perpendicularX * spread;
+    const endY =
+      anchorY +
+      ribbonDirectionY * ribbonLength +
+      perpendicularY * spread;
+    const firstControlX =
+      anchorX +
+      ribbonDirectionX * ribbonLength * 0.32 -
+      perpendicularX * spread * 0.28;
+    const firstControlY =
+      anchorY +
+      ribbonDirectionY * ribbonLength * 0.32 -
+      perpendicularY * spread * 0.28;
+    const secondControlX =
+      anchorX +
+      ribbonDirectionX * ribbonLength * 0.7 +
+      perpendicularX * spread * 0.54;
+    const secondControlY =
+      anchorY +
+      ribbonDirectionY * ribbonLength * 0.7 +
+      perpendicularY * spread * 0.54;
+
+    context.strokeStyle = color;
+    context.globalAlpha = 0.86 + (index % 3) * 0.05;
+    context.lineWidth = clamp(coneHeight * 0.042, 0.85, 2.2);
+    context.lineCap = "round";
+    context.beginPath();
+    context.moveTo(anchorX, anchorY);
+    context.bezierCurveTo(
+      firstControlX,
+      firstControlY,
+      secondControlX,
+      secondControlY,
+      endX,
+      endY,
+    );
+    context.stroke();
+  });
+
+  context.globalAlpha = 1;
+  context.fillStyle = "rgba(244, 239, 214, 0.98)";
+  context.beginPath();
+  context.arc(
+    tip.x,
+    tip.y + 1,
+    clamp(coneWidth * 0.12, 1.4, 3.3),
+    0,
+    Math.PI * 2,
+  );
+  context.fill();
+  context.restore();
 }
 
 function drawDownwashGround(
@@ -1680,6 +1921,13 @@ export function drawPilotScene(
     droneImage,
     droneLayer,
     guideMode = "full",
+    wind = {
+      active: windActive,
+      directionX: -1,
+      directionZ: 0,
+      speedMps: windActive ? 2.4 : 0.45,
+    },
+    animationTime = state.elapsed,
   } = options;
   context.clearRect(0, 0, width, height);
 
@@ -1696,6 +1944,13 @@ export function drawPilotScene(
     drawPerspectiveGrid(context, width, height);
   }
   drawCourseInfrastructure(context, width, height);
+  drawWindStreamer(
+    context,
+    width,
+    height,
+    wind,
+    animationTime,
+  );
   drawDownwashGround(context, width, height, state);
   drawDroneShadow(context, width, height, state);
   if (guideMode === "full") {
@@ -1738,28 +1993,6 @@ export function drawPilotScene(
         state.elapsed,
       );
     }
-  }
-
-  if (windActive) {
-    context.save();
-    context.strokeStyle = "rgba(105, 215, 242, 0.7)";
-    context.fillStyle = "rgba(105, 215, 242, 0.8)";
-    context.lineWidth = 2;
-    for (let index = 0; index < 4; index += 1) {
-      const x = width * (0.66 + index * 0.075);
-      const y = height * (0.33 + (index % 2) * 0.035);
-      context.beginPath();
-      context.moveTo(x, y);
-      context.lineTo(x + 36, y - 8);
-      context.stroke();
-      context.beginPath();
-      context.moveTo(x + 36, y - 8);
-      context.lineTo(x + 27, y - 13);
-      context.lineTo(x + 29, y - 3);
-      context.closePath();
-      context.fill();
-    }
-    context.restore();
   }
 
   const droneDepth = toViewSpace(state.x, state.z).depth;
